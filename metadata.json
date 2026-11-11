@@ -1,0 +1,6 @@
+{
+  "name": "Erudito",
+  "description": "Biblioteca pessoal de conhecimento integrada à Wikipédia com coleções e leitura offline.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

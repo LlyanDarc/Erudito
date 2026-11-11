@@ -1,0 +1,244 @@
+# Erudito — Especificação do Projeto
+
+## 1. Visão geral
+
+**Nome:** Erudito
+
+**Descrição:** O Erudito é um aplicativo Android de biblioteca pessoal de conhecimento, integrado à Wikipédia, que permite pesquisar assuntos, consultar artigos e organizar conteúdos em coleções personalizadas.
+
+O aplicativo tem como objetivo facilitar o armazenamento e a organização de informações relevantes, permitindo que o usuário construa sua própria biblioteca de conhecimentos e consulte conteúdos previamente salvos mesmo sem conexão com a internet.
+
+## 2. Objetivo
+
+Desenvolver uma aplicação Android funcional que permita pesquisar artigos da Wikipédia, armazená-los localmente e organizá-los em coleções personalizadas.
+
+Além de oferecer uma ferramenta de organização de conhecimento, o projeto busca aplicar conceitos de engenharia de software, incluindo Clean Architecture, desenvolvimento orientado a especificações (SDD), persistência local, consumo de APIs REST, programação assíncrona e testes automatizados.
+
+## 3. Problema a ser resolvido
+
+Durante pesquisas na internet, é comum encontrar diversos conteúdos interessantes que acabam se perdendo entre páginas, favoritos e históricos de navegação.
+
+O Erudito pretende solucionar esse problema oferecendo um espaço centralizado no qual o usuário possa salvar artigos, separá-los por assuntos e consultá-los posteriormente.
+
+## 4. Público-alvo
+
+Usuários interessados em pesquisar, armazenar e organizar informações sobre diferentes assuntos, especialmente estudantes e pessoas que desejam construir uma biblioteca pessoal de conhecimentos.
+
+## 5. Funcionalidades
+
+### 5.1. Pesquisa de artigos
+
+- Permitir que o usuário pesquise assuntos utilizando a API da Wikipédia.
+- Exibir uma lista de artigos relacionados à pesquisa.
+- Apresentar o título, uma breve descrição e uma imagem, quando disponível.
+- Permitir a abertura de um artigo para consultar seu conteúdo.
+- Apresentar estados de carregamento, resultados, ausência de resultados e erros.
+
+### 5.2. Consulta de artigos
+
+- Exibir o título e o conteúdo do artigo selecionado.
+- Apresentar imagens quando disponíveis.
+- Permitir que o usuário salve o artigo em uma ou mais coleções.
+- Permitir consultar artigos previamente armazenados sem conexão com a internet.
+- Disponibilizar uma referência para o artigo original na Wikipédia.
+
+### 5.3. Gerenciamento de coleções
+
+- Permitir criar coleções com nomes personalizados.
+- Permitir criar múltiplas coleções.
+- Permitir renomear coleções existentes.
+- Permitir excluir coleções.
+- Exibir as coleções criadas pelo usuário.
+- Permitir abrir uma coleção e visualizar seus artigos.
+
+### 5.4. Organização de artigos
+
+- Permitir adicionar artigos às coleções.
+- Permitir remover artigos de uma coleção.
+- Permitir adicionar o mesmo artigo a diferentes coleções.
+- Impedir que um mesmo artigo seja duplicado dentro da mesma coleção.
+- Manter os artigos armazenados localmente para consulta posterior.
+
+### 5.5. Funcionamento offline
+
+O aplicativo deverá priorizar os dados armazenados localmente.
+
+As seguintes funcionalidades deverão permanecer disponíveis sem conexão com a internet:
+
+- Visualizar as coleções existentes.
+- Criar, renomear e excluir coleções.
+- Consultar os artigos previamente armazenados.
+- Adicionar artigos armazenados a outras coleções.
+- Remover artigos das coleções.
+
+A pesquisa de novos artigos e a obtenção de conteúdos ainda não armazenados dependerão de conexão com a internet.
+
+Quando a conexão estiver disponível, o aplicativo poderá consultar a Wikipédia e atualizar os conteúdos locais conforme a estratégia de sincronização definida no planejamento técnico.
+
+## 6. Requisitos funcionais
+
+| Código | Requisito |
+|---|---|
+| RF01 | O sistema deve permitir pesquisar artigos na Wikipédia. |
+| RF02 | O sistema deve apresentar os resultados da pesquisa. |
+| RF03 | O sistema deve permitir consultar o conteúdo de um artigo. |
+| RF04 | O sistema deve permitir criar coleções personalizadas. |
+| RF05 | O sistema deve permitir renomear coleções. |
+| RF06 | O sistema deve permitir excluir coleções. |
+| RF07 | O sistema deve permitir adicionar artigos às coleções. |
+| RF08 | O sistema deve permitir remover artigos das coleções. |
+| RF09 | O sistema deve permitir que um artigo pertença a várias coleções. |
+| RF10 | O sistema deve impedir artigos duplicados na mesma coleção. |
+| RF11 | O sistema deve armazenar localmente os artigos salvos. |
+| RF12 | O sistema deve permitir consultar coleções e artigos salvos offline. |
+| RF13 | O sistema deve atualizar conteúdos armazenados quando houver conexão, conforme a estratégia de sincronização. |
+| RF14 | O sistema deve informar o usuário sobre situações de carregamento, ausência de resultados e erros. |
+
+## 7. Requisitos não funcionais
+
+| Código | Requisito |
+|---|---|
+| RNF01 | O aplicativo deve ser desenvolvido utilizando Kotlin. |
+| RNF02 | A interface deve utilizar Jetpack Compose. |
+| RNF03 | A navegação deve utilizar Navigation Compose. |
+| RNF04 | O projeto deve implementar Clean Architecture. |
+| RNF05 | A injeção de dependências deve utilizar Hilt ou Koin. |
+| RNF06 | Operações assíncronas devem utilizar Kotlin Coroutines. |
+| RNF07 | A observação de dados deve utilizar Flow ou StateFlow. |
+| RNF08 | O consumo da API REST deve utilizar Retrofit. |
+| RNF09 | A persistência local deve utilizar Room. |
+| RNF10 | As operações de rede e banco de dados não devem bloquear a thread principal. |
+| RNF11 | O aplicativo deve apresentar tratamento adequado de erros e exceções. |
+| RNF12 | O projeto deve possuir testes unitários para as principais regras de negócio. |
+| RNF13 | O código deve ser organizado, compreensível e de fácil manutenção. |
+| RNF14 | O aplicativo deve evitar recomposições desnecessárias e vazamentos de memória. |
+
+## 8. Regras de negócio
+
+**RN01 — Nome das coleções:** Uma coleção não pode ser criada com um nome vazio ou composto apenas por espaços.
+
+**RN02 — Identificação dos artigos:** Cada artigo deve possuir uma identificação que permita reconhecê-lo independentemente da coleção em que esteja armazenado.
+
+**RN03 — Associação de artigos:** Um artigo pode pertencer a várias coleções simultaneamente.
+
+**RN04 — Duplicidade:** Um artigo não pode ser associado mais de uma vez à mesma coleção.
+
+**RN05 — Exclusão de coleção:** Ao excluir uma coleção, suas associações com artigos também devem ser removidas.
+
+**RN06 — Persistência:** As coleções e os artigos salvos devem permanecer disponíveis após o fechamento e a reabertura do aplicativo.
+
+**RN07 — Operações offline:** O gerenciamento de coleções e das associações de artigos já armazenados não deve depender de conexão com a internet.
+
+## 9. API externa
+
+O aplicativo utilizará a API da Wikipédia, baseada na plataforma MediaWiki.
+
+A API será responsável por fornecer informações utilizadas na pesquisa e consulta de artigos.
+
+**Documentação oficial:**
+
+- MediaWiki REST API: https://www.mediawiki.org/wiki/API:REST_API
+- MediaWiki Action API: https://www.mediawiki.org/wiki/API:Main_page
+
+A escolha da Wikipédia se justifica pela variedade de assuntos disponíveis, pela possibilidade de realizar consultas públicas sem necessidade de chave de API nas operações comuns e pela compatibilidade com a proposta de uma biblioteca pessoal de conhecimento.
+
+## 10. Arquitetura proposta
+
+O projeto deverá utilizar Clean Architecture, dividido em três camadas principais:
+
+### Presentation
+Responsável pela interface e interação com o usuário.
+
+Deverá conter:
+- Telas e componentes Jetpack Compose.
+- Navegação entre telas.
+- Gerenciamento de estados.
+- ViewModels.
+
+### Domain
+Responsável pelas regras de negócio da aplicação.
+
+Deverá conter:
+- Entidades.
+- Interfaces dos repositórios.
+- Casos de uso (Use Cases).
+- Regras de validação e organização dos artigos e coleções.
+
+A camada Domain não deverá depender de bibliotecas Android, APIs externas ou detalhes de persistência.
+
+### Data
+Responsável pelo acesso e armazenamento dos dados.
+
+Deverá conter:
+- Implementação dos repositórios.
+- Serviços de comunicação com a Wikipédia utilizando Retrofit.
+- Banco de dados local utilizando Room.
+- Mapeamento entre modelos de dados.
+- Estratégia de sincronização.
+
+As dependências entre as camadas deverão respeitar os princípios da Clean Architecture.
+
+## 11. Persistência e relacionamento dos dados
+
+O banco de dados local deverá armazenar as coleções e os artigos.
+
+O relacionamento entre artigos e coleções deverá permitir uma relação muitos-para-muitos (N:N).
+
+Isso significa que:
+
+- Uma coleção poderá possuir vários artigos.
+- Um artigo poderá pertencer a várias coleções.
+- Os dados do artigo deverão ser armazenados uma única vez, evitando duplicação desnecessária.
+
+O relacionamento deverá ser implementado utilizando uma tabela intermediária no Room.
+
+## 12. Estratégia de testes
+
+Os testes unitários deverão priorizar as regras de negócio da camada Domain.
+
+Deverão ser testados, entre outros:
+
+- Validação de nomes de coleções.
+- Criação e renomeação de coleções.
+- Associação de artigos às coleções.
+- Prevenção de associações duplicadas.
+- Associação de um mesmo artigo a diferentes coleções.
+- Remoção de artigos das coleções.
+- Exclusão de coleções e suas associações.
+
+Os testes deverão utilizar JUnit e poderão utilizar MockK para simular dependências, evitando a necessidade de acessar a API ou o banco de dados durante os testes das regras de negócio.
+
+## 13. Critérios de aceitação
+
+O aplicativo será considerado funcional quando:
+
+1. Permitir pesquisar artigos na Wikipédia.
+2. Exibir os resultados e permitir consultar os artigos.
+3. Permitir criar, renomear e excluir coleções.
+4. Permitir salvar artigos em diferentes coleções.
+5. Impedir a duplicação de um artigo dentro da mesma coleção.
+6. Armazenar os dados localmente utilizando Room.
+7. Permitir consultar artigos e organizar coleções sem conexão com a internet.
+8. Apresentar estados adequados de carregamento, sucesso, ausência de dados e erro.
+9. Possuir tratamento de falhas previsíveis.
+10. Possuir testes unitários das principais regras de negócio.
+11. Respeitar a arquitetura e as tecnologias estabelecidas na especificação.
+
+## 14. Limites iniciais do projeto
+
+Para manter o escopo adequado à atividade acadêmica, inicialmente não fazem parte dos objetivos:
+
+- Criação de contas e autenticação de usuários.
+- Sincronização de dados entre diferentes dispositivos.
+- Compartilhamento de coleções entre usuários.
+- Edição do conteúdo original dos artigos.
+- Integração com outras fontes de conhecimento além da Wikipédia.
+
+Funcionalidades adicionais poderão ser consideradas futuramente, desde que não comprometam os requisitos obrigatórios da atividade.
+
+---
+
+**Documento:** SPECIFICATION.md  
+**Projeto:** Erudito  
+**Etapa SDD:** Specification  
+**Status:** Especificação inicial

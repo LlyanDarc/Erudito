@@ -1,0 +1,447 @@
+# Erudito — Planejamento Técnico
+
+## 1. Visão geral
+
+Este documento define o planejamento técnico e a estratégia de desenvolvimento do aplicativo Erudito, utilizando a abordagem Spec-Driven Development (SDD).
+
+O planejamento estabelece as tecnologias, a arquitetura, a estrutura do projeto, a organização dos dados, a comunicação com a API externa, a estratégia Offline First e a divisão da implementação em bundles.
+
+Todas as decisões deverão respeitar os requisitos definidos no `SPECIFICATION.md`.
+
+## 2. Tecnologias e ferramentas
+
+| Tecnologia | Finalidade |
+|---|---|
+| Kotlin | Linguagem principal do aplicativo |
+| Jetpack Compose | Desenvolvimento das interfaces |
+| Navigation Compose | Navegação entre telas |
+| Retrofit | Consumo da API da Wikipédia |
+| Room | Persistência local |
+| Kotlin Coroutines | Execução de operações assíncronas |
+| Flow / StateFlow | Observação e comunicação de dados |
+| Hilt | Injeção de dependências |
+| JUnit | Testes unitários |
+| MockK | Simulação de dependências nos testes |
+| Git | Versionamento do projeto |
+| Google AI Studio | Apoio à geração e implementação do código |
+| Android Studio | Execução, depuração, testes e geração do APK |
+
+A injeção de dependências será implementada utilizando Hilt.
+
+As versões das bibliotecas deverão ser compatíveis entre si e com a versão do Android Gradle Plugin e do Kotlin escolhidas para o projeto.
+
+## 3. Arquitetura do projeto
+
+O aplicativo utilizará Clean Architecture, organizada em três camadas principais.
+
+### 3.1. Presentation
+
+Responsável pela interface e interação com o usuário.
+
+Componentes:
+- Telas desenvolvidas com Jetpack Compose.
+- Componentes visuais reutilizáveis.
+- Navegação com Navigation Compose.
+- ViewModels.
+- Estados de interface utilizando StateFlow.
+- Tratamento e apresentação de estados de carregamento, sucesso, ausência de dados e erro.
+
+As telas não deverão acessar diretamente o banco de dados ou os serviços da API.
+
+### 3.2. Domain
+
+Responsável pelas regras de negócio e operações principais do aplicativo.
+
+Componentes:
+- Entidades de negócio.
+- Interfaces dos repositórios.
+- Casos de uso (Use Cases).
+- Regras de validação.
+- Operações relacionadas às coleções e aos artigos.
+
+Os casos de uso deverão concentrar as operações e regras de negócio, evitando que essas responsabilidades sejam implementadas diretamente nas telas ou nos ViewModels.
+
+A camada Domain não deverá depender de Android, Retrofit, Room ou outras tecnologias de infraestrutura.
+
+### 3.3. Data
+
+Responsável pelo acesso, armazenamento e fornecimento dos dados.
+
+Componentes:
+- Implementações dos repositórios.
+- Serviços Retrofit.
+- DTOs utilizados na comunicação com a Wikipédia.
+- Entidades e DAOs do Room.
+- Mapeadores entre modelos de dados.
+- Estratégia de cache e sincronização.
+
+Os repositórios deverão abstrair a origem dos dados, permitindo que a camada Domain utilize as informações sem conhecer os detalhes de sua obtenção.
+
+## 4. Estrutura planejada do projeto
+
+A estrutura deverá seguir uma organização por funcionalidades, respeitando a separação das camadas da Clean Architecture.
+
+Estrutura inicial proposta:
+
+```text
+Erudito/
+│
+├── app/
+│   ├── src/
+│   │   ├── main/
+│   │   │   ├── java/com/erudito/
+│   │   │   │   ├── di/
+│   │   │   │   ├── presentation/
+│   │   │   │   │   ├── navigation/
+│   │   │   │   │   ├── components/
+│   │   │   │   │   ├── home/
+│   │   │   │   │   ├── collections/
+│   │   │   │   │   ├── search/
+│   │   │   │   │   └── article/
+│   │   │   │   │
+│   │   │   │   ├── domain/
+│   │   │   │   │   ├── model/
+│   │   │   │   │   ├── repository/
+│   │   │   │   │   └── usecase/
+│   │   │   │   │
+│   │   │   │   ├── data/
+│   │   │   │   │   ├── local/
+│   │   │   │   │   │   ├── database/
+│   │   │   │   │   │   ├── dao/
+│   │   │   │   │   │   └── entity/
+│   │   │   │   │   ├── remote/
+│   │   │   │   │   │   ├── api/
+│   │   │   │   │   │   └── dto/
+│   │   │   │   │   ├── mapper/
+│   │   │   │   │   └── repository/
+│   │   │   │   │
+│   │   │   │   └── MainActivity.kt
+│   │   │   │
+│   │   │   └── AndroidManifest.xml
+│   │   │
+│   │   └── test/
+│   │       └── java/com/erudito/
+│   │
+│   └── build.gradle.kts
+│
+├── SPECIFICATION.md
+├── PLANNING.md
+├── TASKS.md
+├── AI_USAGE.md
+└── README.md
+```
+
+A estrutura poderá receber ajustes durante a implementação, desde que mantenha a separação de responsabilidades e respeite a Clean Architecture.
+
+## 5. Modelagem e persistência dos dados
+
+O Room será utilizado como banco de dados local principal.
+
+Inicialmente, serão necessárias três estruturas principais.
+
+### 5.1. ArticleEntity
+
+Representará os artigos armazenados.
+
+Campos planejados:
+
+- `id`: identificador local.
+- `title`: título do artigo.
+- `url`: endereço original na Wikipédia.
+- `description`: breve descrição.
+- `content`: conteúdo armazenado.
+- `imageUrl`: endereço da imagem, quando disponível.
+- `lastUpdated`: data da última atualização do conteúdo.
+
+A identificação do artigo deverá permitir reconhecer o mesmo conteúdo independentemente da coleção em que estiver armazenado.
+
+### 5.2. CollectionEntity
+
+Representará as coleções criadas pelo usuário.
+
+Campos planejados:
+
+- `id`: identificador da coleção.
+- `name`: nome personalizado.
+- `createdAt`: data de criação.
+
+### 5.3. CollectionArticleCrossRef
+
+Será a tabela intermediária responsável pelo relacionamento muitos-para-muitos.
+
+Campos:
+
+- `collectionId`: identificador da coleção.
+- `articleId`: identificador do artigo.
+
+A combinação dos dois identificadores deverá ser única, impedindo que um artigo seja associado mais de uma vez à mesma coleção.
+
+A exclusão de uma coleção deverá remover suas associações sem excluir artigos que ainda estejam relacionados a outras coleções.
+
+Artigos que não estiverem associados a nenhuma coleção poderão ser removidos do armazenamento local, conforme a regra de gerenciamento de dados definida na implementação.
+
+## 6. Integração com a Wikipédia
+
+A comunicação com a Wikipédia será realizada por meio da API MediaWiki, utilizando Retrofit.
+
+A integração deverá contemplar:
+
+- Pesquisa de artigos.
+- Recuperação de títulos e descrições.
+- Recuperação de imagens disponíveis.
+- Consulta ao conteúdo dos artigos.
+- Obtenção de informações necessárias para identificar os artigos.
+
+Os resultados da API deverão ser convertidos em modelos próprios do aplicativo antes de serem disponibilizados à camada Domain.
+
+A implementação deverá utilizar operações assíncronas e tratar adequadamente falhas de conexão, respostas inválidas e ausência de resultados.
+
+A API será utilizada para buscar e atualizar conteúdos, enquanto o Room será responsável pelo armazenamento local.
+
+## 7. Estratégia Offline First
+
+O Room será a fonte local de dados para os artigos e coleções armazenados.
+
+A estratégia será organizada da seguinte maneira:
+
+### Consulta de coleções
+
+As coleções serão consultadas diretamente no banco local, utilizando Flow para observar alterações.
+
+### Consulta de artigos salvos
+
+Os artigos armazenados serão recuperados pelo Room, permitindo sua leitura sem conexão com a internet.
+
+### Pesquisa de novos artigos
+
+A pesquisa será realizada pela API da Wikipédia e dependerá de conexão com a internet.
+
+### Salvamento de artigos
+
+Ao salvar um artigo, seus dados deverão ser persistidos no Room para permitir consultas futuras offline.
+
+### Atualização de conteúdos
+
+Quando houver conexão, o aplicativo poderá consultar a API para verificar atualizações dos artigos armazenados.
+
+A estratégia deverá considerar a data da última atualização, falhas de conexão e preservação dos dados locais.
+
+A implementação deverá evitar que uma falha na comunicação com a API impeça o acesso aos conteúdos já armazenados.
+
+## 8. Navegação e organização das interfaces
+
+A navegação será implementada utilizando Navigation Compose.
+
+As principais telas planejadas são:
+
+### Tela inicial
+
+Será o ponto principal de acesso à biblioteca, apresentando as coleções e permitindo iniciar pesquisas.
+
+### Tela de coleções
+
+Apresentará as coleções criadas pelo usuário e permitirá criar, renomear e excluir coleções.
+
+### Tela de conteúdo da coleção
+
+Apresentará os artigos associados à coleção selecionada.
+
+### Tela de pesquisa
+
+Permitirá pesquisar assuntos na Wikipédia e visualizar os resultados encontrados.
+
+### Tela de leitura do artigo
+
+Apresentará o conteúdo do artigo selecionado, suas informações e as opções de salvamento nas coleções.
+
+A navegação deverá permitir transitar entre essas funcionalidades sem perder desnecessariamente o estado das telas.
+
+## 9. Gerenciamento de estado
+
+O gerenciamento de estado será realizado principalmente por meio de ViewModels e StateFlow.
+
+As interfaces deverão observar os estados disponibilizados pelos ViewModels.
+
+Os estados deverão contemplar:
+
+- Carregamento.
+- Sucesso com dados.
+- Sucesso sem resultados.
+- Erro.
+- Conteúdo disponível localmente.
+
+As operações assíncronas deverão utilizar Coroutines.
+
+As telas deverão reagir às alterações dos dados sem executar operações de acesso à API ou ao banco diretamente na interface.
+
+## 10. Estratégia de testes
+
+Os testes unitários deverão priorizar a camada Domain, validando as regras de negócio sem depender de infraestrutura Android.
+
+JUnit será utilizado para estruturar e executar os testes.
+
+MockK poderá ser utilizado para simular as interfaces dos repositórios e outras dependências.
+
+As principais áreas de teste serão:
+
+- Criação e validação de coleções.
+- Renomeação e exclusão de coleções.
+- Associação de artigos.
+- Prevenção de duplicidade.
+- Associação de artigos a múltiplas coleções.
+- Remoção de artigos.
+- Integridade das associações.
+
+Também poderão ser implementados testes adicionais para os repositórios e comportamentos de integração, conforme a necessidade.
+
+Os resultados deverão ser registrados em `TEST_RESULTS.md`.
+
+## 11. Organização do desenvolvimento por bundles
+
+A implementação será dividida em bundles funcionais, evitando fragmentação excessiva.
+
+Cada bundle deverá entregar uma parte funcional do aplicativo, incluindo as telas, regras de negócio, persistência e integrações necessárias.
+
+### Bundle 1 — Biblioteca pessoal offline
+
+Implementar a estrutura funcional da biblioteca local.
+
+Inclui:
+- Tela inicial da biblioteca.
+- Tela de coleções.
+- Criação de coleções.
+- Renomeação de coleções.
+- Exclusão de coleções.
+- Visualização das coleções existentes.
+- Persistência local com Room.
+- Visualização dos artigos já armazenados.
+- Regras de negócio e testes relacionados.
+
+**Resultado esperado:** biblioteca pessoal funcional, com gerenciamento local de coleções.
+
+### Bundle 2 — Pesquisa e consulta à Wikipédia
+
+Implementar a pesquisa e a consulta de conteúdos externos.
+
+Inclui:
+- Tela de pesquisa.
+- Integração Retrofit com a Wikipédia.
+- Exibição dos resultados.
+- Títulos, descrições e imagens disponíveis.
+- Tela de leitura dos artigos.
+- Estados de carregamento, sucesso, ausência de resultados e erro.
+
+**Resultado esperado:** pesquisa e consulta de artigos da Wikipédia funcionando.
+
+### Bundle 3 — Integração entre artigos e coleções
+
+Implementar a organização dos artigos encontrados.
+
+Inclui:
+- Salvar artigos nas coleções.
+- Selecionar uma ou várias coleções.
+- Permitir que um artigo pertença a várias coleções.
+- Impedir duplicações na mesma coleção.
+- Remover artigos das coleções.
+- Integrar os dados da API com o armazenamento local.
+
+**Resultado esperado:** usuário consegue construir sua biblioteca pessoal com artigos da Wikipédia.
+
+### Bundle 4 — Offline First e sincronização
+
+Implementar e validar o funcionamento integrado online e offline.
+
+Inclui:
+- Leitura offline dos artigos armazenados.
+- Organização das coleções sem internet.
+- Gerenciamento dos dados locais.
+- Atualização dos artigos quando houver conexão.
+- Tratamento de falhas de sincronização.
+- Verificação da consistência dos dados locais.
+
+**Resultado esperado:** aplicativo funcional nas condições online e offline previstas na especificação.
+
+### Bundle 5 — Finalização e validação
+
+Realizar a revisão geral do aplicativo.
+
+Inclui:
+- Revisão do tratamento de erros.
+- Execução dos testes unitários.
+- Correção de problemas identificados.
+- Verificação da navegação.
+- Testes de funcionamento offline.
+- Atualização da documentação.
+- Preparação das evidências.
+- Geração do APK de depuração sem assinatura de distribuição.
+
+**Resultado esperado:** aplicação validada e pronta para entrega.
+
+## 12. Processo de implementação com Google AI Studio
+
+O Google AI Studio será utilizado como ferramenta de apoio à implementação do aplicativo.
+
+A especificação e o planejamento deverão ser fornecidos como referência para orientar a geração e modificação do código.
+
+O desenvolvimento deverá respeitar as seguintes diretrizes:
+
+1. A IA deverá considerar o conteúdo completo do `SPECIFICATION.md` e do `PLANNING.md`.
+2. Cada solicitação de implementação deverá se limitar ao bundle atual.
+3. A IA deverá respeitar as decisões arquiteturais estabelecidas.
+4. Não deverá antecipar funcionalidades de bundles futuros.
+5. Alterações em funcionalidades anteriores deverão preservar seu funcionamento.
+6. Ao concluir cada bundle, deverá apresentar os arquivos criados ou modificados e explicar as principais decisões da implementação.
+7. O código deverá ser revisado e validado antes de considerar o bundle concluído.
+
+O projeto deverá manter uma única versão principal do código, evitando divergências entre cópias.
+
+## 13. Versionamento
+
+O Git será utilizado para registrar a evolução incremental do projeto.
+
+Os commits deverão ser realizados após a conclusão de etapas relevantes, como documentação inicial e bundles funcionais.
+
+Serão utilizadas mensagens claras, seguindo preferencialmente os padrões:
+
+- `docs:` para documentação.
+- `feat:` para novas funcionalidades.
+- `fix:` para correções.
+- `test:` para testes.
+- `refactor:` para reorganização interna sem alteração de comportamento.
+
+O histórico deverá representar a evolução real do aplicativo.
+
+## 14. Documentação e entregáveis
+
+O projeto deverá manter os seguintes documentos:
+
+| Arquivo | Finalidade |
+|---|---|
+| `SPECIFICATION.md` | Definição dos requisitos e funcionalidades |
+| `PLANNING.md` | Planejamento técnico e arquitetural |
+| `TASKS.md` | Organização dos bundles e tarefas |
+| `AI_USAGE.md` | Registro da utilização de IA |
+| `README.md` | Documentação geral do projeto |
+| `TEST_RESULTS.md` | Registro dos testes executados e resultados |
+
+Ao final, também deverão estar disponíveis:
+
+- Código-fonte completo.
+- Histórico de commits.
+- Testes unitários.
+- APK debug sem assinatura de distribuição.
+- Capturas de tela das principais funcionalidades.
+- Evidências de funcionamento offline.
+
+## 15. Critério de conclusão
+
+O projeto será considerado concluído quando todos os bundles estiverem implementados e os requisitos definidos no `SPECIFICATION.md` tiverem sido atendidos ou suas limitações devidamente documentadas.
+
+A validação final deverá verificar o funcionamento das principais funcionalidades, a integridade dos dados locais, a arquitetura, os testes e a documentação.
+
+---
+
+**Documento:** PLANNING.md  
+**Projeto:** Erudito  
+**Etapa SDD:** Planning  
+**Status:** Planejamento inicial
