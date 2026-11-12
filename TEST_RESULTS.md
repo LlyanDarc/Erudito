@@ -18,11 +18,12 @@
 | Domain | `GetSavedArticlesUseCaseTest` | 2 | 2 | 0 | < 0.01s |
 | Domain | `GetArticleByIdUseCaseTest` | 2 | 2 | 0 | 0.01s |
 | Data (Room Integration) | `RoomDatabaseIntegrationTest` | 6 | 6 | 0 | 9.10s |
-| Presentation / Resources | `ExampleRobolectricTest` | 1 | 1 | 0 | 9.33s |
+| Presentation (UI & Compose) | `HomeScreenDuplicateKeyTest` | 1 | 1 | 0 | 2.74s |
+| Presentation / Resources | `ExampleRobolectricTest` | 1 | 1 | 0 | 5.61s |
 | Unit | `ExampleUnitTest` | 1 | 1 | 0 | < 0.01s |
-| **Total** | **10 Suites** | **25** | **25** | **0** | **46s (build completo)** |
+| **Total** | **11 Suites** | **26** | **26** | **0** | **56s (build completo)** |
 
-**Resultado Geral:** **SUCESSO (100% de aprovação — 25 testes)**
+**Resultado Geral:** **SUCESSO (100% de aprovação — 26 testes)**
 
 ---
 

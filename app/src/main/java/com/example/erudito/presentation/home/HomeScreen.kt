@@ -58,13 +58,33 @@ fun HomeScreen(
     onNavigateToCollections: () -> Unit,
     onNavigateToCollectionDetail: (Long) -> Unit,
     onNavigateToArticleDetail: (Long) -> Unit,
-    modifier: Modifier = Modifier,
-    onCreateCollection: (String) -> Unit = { viewModel.createCollection(it) },
-    onRenameCollection: (Long, String) -> Unit = { id, name -> viewModel.renameCollection(id, name) },
-    onDeleteCollection: (Long) -> Unit = { viewModel.deleteCollection(it) }
+    modifier: Modifier = Modifier
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
+    HomeScreenContent(
+        uiState = uiState,
+        onNavigateToCollections = onNavigateToCollections,
+        onNavigateToCollectionDetail = onNavigateToCollectionDetail,
+        onNavigateToArticleDetail = onNavigateToArticleDetail,
+        onCreateCollection = { viewModel.createCollection(it) },
+        onRenameCollection = { id, name -> viewModel.renameCollection(id, name) },
+        onDeleteCollection = { viewModel.deleteCollection(it) },
+        modifier = modifier
+    )
+}
+
+@Composable
+fun HomeScreenContent(
+    uiState: HomeUiState,
+    onNavigateToCollections: () -> Unit,
+    onNavigateToCollectionDetail: (Long) -> Unit,
+    onNavigateToArticleDetail: (Long) -> Unit,
+    onCreateCollection: (String) -> Unit,
+    onRenameCollection: (Long, String) -> Unit,
+    onDeleteCollection: (Long) -> Unit,
+    modifier: Modifier = Modifier
+) {
     var isCreateDialogOpen by remember { mutableStateOf(false) }
     var collectionToRename by remember { mutableStateOf<com.example.erudito.domain.model.Collection?>(null) }
     var collectionToDelete by remember { mutableStateOf<com.example.erudito.domain.model.Collection?>(null) }
@@ -247,7 +267,7 @@ fun HomeScreen(
                 } else {
                     items(
                         items = uiState.collections.take(3),
-                        key = { it.id }
+                        key = { "collection_${it.id}" }
                     ) { collection ->
                         CollectionCard(
                             collection = collection,
@@ -259,7 +279,7 @@ fun HomeScreen(
                 }
 
                 // Seção Artigos Salvos na Biblioteca
-                item {
+                item(key = "section_recent_articles_header") {
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
                         text = "Artigos Armazenados Localmente",
@@ -269,7 +289,7 @@ fun HomeScreen(
                 }
 
                 if (uiState.recentArticles.isEmpty()) {
-                    item {
+                    item(key = "empty_state_recent_articles") {
                         EmptyStateView(
                             icon = Icons.Default.Book,
                             title = "Nenhum artigo salvo",
@@ -279,7 +299,7 @@ fun HomeScreen(
                 } else {
                     items(
                         items = uiState.recentArticles,
-                        key = { it.id }
+                        key = { "article_${it.id}" }
                     ) { article ->
                         ArticleCard(
                             article = article,

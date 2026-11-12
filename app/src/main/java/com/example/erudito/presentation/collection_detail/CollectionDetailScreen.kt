@@ -299,7 +299,7 @@ fun CollectionDetailScreen(
                 } else {
                     items(
                         items = articles,
-                        key = { it.id }
+                        key = { "article_${it.id}" }
                     ) { article ->
                         ArticleCard(
                             article = article,

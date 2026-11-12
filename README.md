@@ -34,7 +34,7 @@ O **Erudito** é um aplicativo Android desenvolvido em Kotlin e Jetpack Compose 
   - Persistência total garantida após fechar e reabrir o aplicativo.
 - **Clean Architecture & Injeção de Dependências:**
   - Separação estrita entre camadas: **Presentation** (Compose, ViewModels, Navigation), **Domain** (Modelos puros, Use Cases, Interfaces de Repositório) e **Data** (Room DAOs, Entities, Mappers, Repositórios).
-  - Contêiner de Injeção de Dependências (`AppContainer` / `EruditoViewModelFactory`).
+  - Injeção de dependências com Dagger Hilt (`EruditoHiltModule`, `@AndroidEntryPoint`, `@HiltViewModel`, `@Inject`).
 
 ---
 
@@ -51,7 +51,7 @@ com.example.erudito/
 │   │   └── entity/       # CollectionEntity, ArticleEntity, CollectionArticleCrossRef
 │   ├── mapper/           # Mapeadores entre entidades de banco e modelos de domínio
 │   └── repository/       # Implementação dos repositórios
-├── di/                   # Contêiner de Injeção de Dependências (AppContainer, ViewModelFactory)
+├── di/                   # Módulo de Injeção de Dependências Hilt (EruditoHiltModule)
 ├── domain/
 │   ├── model/            # Modelos puros: Collection, Article, CollectionWithArticles
 │   ├── repository/       # Interfaces dos repositórios

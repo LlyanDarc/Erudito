@@ -117,7 +117,7 @@ fun CollectionsScreen(
             ) {
                 items(
                     items = uiState.collections,
-                    key = { it.id }
+                    key = { "collection_${it.id}" }
                 ) { collection ->
                     CollectionCard(
                         collection = collection,
