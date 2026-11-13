@@ -9,4 +9,8 @@ sealed class Screen(val route: String) {
     object ArticleDetail : Screen("article/{articleId}") {
         fun createRoute(articleId: Long): String = "article/$articleId"
     }
+    object Search : Screen("search")
+    object WikipediaArticle : Screen("wikipedia_article/{pageId}") {
+        fun createRoute(pageId: Long): String = "wikipedia_article/$pageId"
+    }
 }

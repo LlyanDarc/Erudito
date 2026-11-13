@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -23,6 +24,7 @@ import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.CollectionsBookmark
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.MenuBook
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -65,7 +67,8 @@ fun HomeScreen(
     onNavigateToCollections: () -> Unit,
     onNavigateToCollectionDetail: (Long) -> Unit,
     onNavigateToArticleDetail: (Long) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onNavigateToSearch: () -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
@@ -79,6 +82,7 @@ fun HomeScreen(
         onDeleteCollection = { viewModel.deleteCollection(it) },
         onClearError = { viewModel.clearError() },
         feedbackEvents = viewModel.feedbackEvents,
+        onNavigateToSearch = onNavigateToSearch,
         modifier = modifier
     )
 }
@@ -94,7 +98,8 @@ fun HomeScreenContent(
     onDeleteCollection: (Long) -> Unit,
     modifier: Modifier = Modifier,
     onClearError: () -> Unit = {},
-    feedbackEvents: Flow<String> = emptyFlow()
+    feedbackEvents: Flow<String> = emptyFlow(),
+    onNavigateToSearch: () -> Unit = {}
 ) {
     var isCreateDialogOpen by remember { mutableStateOf(false) }
     var collectionToRename by remember { mutableStateOf<com.example.erudito.domain.model.Collection?>(null) }
@@ -262,6 +267,60 @@ fun HomeScreenContent(
                                         label = "Disponibilidade",
                                         onPrimaryColor = MaterialTheme.colorScheme.onPrimary
                                     )
+                                }
+
+                                Spacer(modifier = Modifier.height(18.dp))
+
+                                Surface(
+                                    onClick = onNavigateToSearch,
+                                    shape = RoundedCornerShape(14.dp),
+                                    color = MaterialTheme.colorScheme.surface,
+                                    tonalElevation = 2.dp,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .heightIn(min = 48.dp)
+                                        .testTag("home_search_button")
+                                ) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = 14.dp, vertical = 12.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Search,
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.primary,
+                                                modifier = Modifier.size(20.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(10.dp))
+                                            Text(
+                                                text = "Pesquisar na Wikipédia...",
+                                                style = MaterialTheme.typography.bodyMedium.copy(
+                                                    fontWeight = FontWeight.Medium
+                                                ),
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                        Surface(
+                                            shape = RoundedCornerShape(8.dp),
+                                            color = MaterialTheme.colorScheme.primaryContainer
+                                        ) {
+                                            Text(
+                                                text = "Online",
+                                                style = MaterialTheme.typography.labelSmall.copy(
+                                                    fontWeight = FontWeight.Bold
+                                                ),
+                                                color = MaterialTheme.colorScheme.primary,
+                                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                            )
+                                        }
+                                    }
                                 }
                             }
                         }
