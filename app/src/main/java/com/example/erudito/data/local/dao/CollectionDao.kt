@@ -25,6 +25,9 @@ interface CollectionDao {
     )
     fun getAllCollectionsWithCount(): Flow<List<CollectionWithCount>>
 
+    @Query("SELECT COUNT(*) FROM collections")
+    suspend fun getCollectionCount(): Int
+
     @Query("SELECT * FROM collections WHERE id = :id")
     suspend fun getCollectionById(id: Long): CollectionEntity?
 

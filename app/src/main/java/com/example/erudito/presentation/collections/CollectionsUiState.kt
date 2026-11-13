@@ -8,6 +8,5 @@ data class CollectionsUiState(
     val isCreateDialogOpen: Boolean = false,
     val collectionToRename: Collection? = null,
     val collectionToDelete: Collection? = null,
-    val errorMessage: String? = null,
-    val userFeedbackMessage: String? = null
+    val errorMessage: String? = null
 )

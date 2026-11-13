@@ -14,6 +14,9 @@ interface ArticleDao {
     @Query("SELECT * FROM articles ORDER BY lastUpdated DESC")
     fun getAllArticles(): Flow<List<ArticleEntity>>
 
+    @Query("SELECT COUNT(*) FROM articles")
+    suspend fun getArticleCount(): Int
+
     @Query("SELECT * FROM articles WHERE id = :id")
     suspend fun getArticleById(id: Long): ArticleEntity?
 

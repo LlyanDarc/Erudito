@@ -9,10 +9,13 @@ import com.example.erudito.domain.usecase.GetCollectionsUseCase
 import com.example.erudito.domain.usecase.RenameCollectionUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -26,6 +29,9 @@ class CollectionsViewModel @Inject constructor(
 
     private val _uiState = MutableStateFlow(CollectionsUiState())
     val uiState: StateFlow<CollectionsUiState> = _uiState.asStateFlow()
+
+    private val _feedbackEvents = Channel<String>(Channel.BUFFERED)
+    val feedbackEvents: Flow<String> = _feedbackEvents.receiveAsFlow()
 
     init {
         loadCollections()
@@ -46,8 +52,7 @@ class CollectionsViewModel @Inject constructor(
                     _uiState.update {
                         it.copy(
                             isLoading = false,
-                            collections = list,
-                            errorMessage = null
+                            collections = list
                         )
                     }
                 }
@@ -81,16 +86,16 @@ class CollectionsViewModel @Inject constructor(
     fun createCollection(name: String) {
         viewModelScope.launch {
             try {
+                val trimmedName = name.trim()
                 createCollectionUseCase(name)
+                _uiState.update { it.copy(isCreateDialogOpen = false) }
+                _feedbackEvents.send("Coleção \"$trimmedName\" criada com sucesso!")
+            } catch (e: Exception) {
                 _uiState.update {
                     it.copy(
                         isCreateDialogOpen = false,
-                        userFeedbackMessage = "Coleção \"$name\" criada com sucesso!"
+                        errorMessage = e.message ?: "Erro ao criar coleção"
                     )
-                }
-            } catch (e: Exception) {
-                _uiState.update {
-                    it.copy(errorMessage = e.message ?: "Erro ao criar coleção")
                 }
             }
         }
@@ -99,16 +104,16 @@ class CollectionsViewModel @Inject constructor(
     fun renameCollection(id: Long, newName: String) {
         viewModelScope.launch {
             try {
+                val trimmedName = newName.trim()
                 renameCollectionUseCase(id, newName)
+                _uiState.update { it.copy(collectionToRename = null) }
+                _feedbackEvents.send("Coleção renomeada para \"$trimmedName\"!")
+            } catch (e: Exception) {
                 _uiState.update {
                     it.copy(
                         collectionToRename = null,
-                        userFeedbackMessage = "Coleção renomeada para \"$newName\"!"
+                        errorMessage = e.message ?: "Erro ao renomear coleção"
                     )
-                }
-            } catch (e: Exception) {
-                _uiState.update {
-                    it.copy(errorMessage = e.message ?: "Erro ao renomear coleção")
                 }
             }
         }
@@ -117,22 +122,33 @@ class CollectionsViewModel @Inject constructor(
     fun deleteCollection(id: Long) {
         viewModelScope.launch {
             try {
+                val collectionName = _uiState.value.collections.find { it.id == id }?.name
                 deleteCollectionUseCase(id)
+                _uiState.update { it.copy(collectionToDelete = null) }
+                val message = if (!collectionName.isNullOrBlank()) {
+                    "Coleção \"$collectionName\" excluída com sucesso!"
+                } else {
+                    "Coleção excluída com sucesso!"
+                }
+                _feedbackEvents.send(message)
+            } catch (e: Exception) {
                 _uiState.update {
                     it.copy(
                         collectionToDelete = null,
-                        userFeedbackMessage = "Coleção excluída com sucesso."
+                        errorMessage = e.message ?: "Erro ao excluir coleção"
                     )
-                }
-            } catch (e: Exception) {
-                _uiState.update {
-                    it.copy(errorMessage = e.message ?: "Erro ao excluir coleção")
                 }
             }
         }
     }
 
+    fun showFeedbackMessage(message: String) {
+        viewModelScope.launch {
+            _feedbackEvents.send(message)
+        }
+    }
+
     fun clearFeedbackMessage() {
-        _uiState.update { it.copy(userFeedbackMessage = null, errorMessage = null) }
+        _uiState.update { it.copy(errorMessage = null) }
     }
 }

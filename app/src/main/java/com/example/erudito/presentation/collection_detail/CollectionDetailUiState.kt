@@ -7,7 +7,8 @@ data class CollectionDetailUiState(
     val collectionWithArticles: CollectionWithArticles? = null,
     val isRenameDialogOpen: Boolean = false,
     val isDeleteDialogOpen: Boolean = false,
+    val isDeleting: Boolean = false,
     val isDeleted: Boolean = false,
-    val errorMessage: String? = null,
-    val feedbackMessage: String? = null
+    val deletedCollectionName: String? = null,
+    val errorMessage: String? = null
 )

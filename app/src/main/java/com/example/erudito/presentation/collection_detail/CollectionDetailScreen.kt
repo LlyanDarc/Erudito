@@ -55,13 +55,16 @@ import com.example.erudito.presentation.components.EruditoTopAppBar
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
 
 @Composable
 fun CollectionDetailScreen(
     viewModel: CollectionDetailViewModel,
     onNavigateBack: () -> Unit,
     onNavigateToArticleDetail: (Long) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onCollectionDeleted: (String) -> Unit = { onNavigateBack() }
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -73,21 +76,35 @@ fun CollectionDetailScreen(
 
     LaunchedEffect(uiState.isDeleted) {
         if (uiState.isDeleted) {
-            onNavigateBack()
+            val deletedName = uiState.deletedCollectionName
+            val message = if (!deletedName.isNullOrBlank()) {
+                "Coleção \"$deletedName\" excluída com sucesso!"
+            } else {
+                "Coleção excluída com sucesso!"
+            }
+            onCollectionDeleted(message)
         }
     }
 
-    LaunchedEffect(uiState.feedbackMessage) {
-        uiState.feedbackMessage?.let { msg ->
-            snackbarHostState.showSnackbar(msg)
-            viewModel.clearFeedback()
+    LaunchedEffect(viewModel.feedbackEvents) {
+        var activeSnackbarJob: Job? = null
+        viewModel.feedbackEvents.collect { msg ->
+            activeSnackbarJob?.cancel()
+            snackbarHostState.currentSnackbarData?.dismiss()
+            activeSnackbarJob = launch {
+                snackbarHostState.showSnackbar(msg)
+            }
         }
     }
 
     LaunchedEffect(uiState.errorMessage) {
         uiState.errorMessage?.let { error ->
-            snackbarHostState.showSnackbar(error)
-            viewModel.clearFeedback()
+            try {
+                snackbarHostState.currentSnackbarData?.dismiss()
+                snackbarHostState.showSnackbar(error)
+            } finally {
+                viewModel.clearFeedback()
+            }
         }
     }
 

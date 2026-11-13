@@ -29,11 +29,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.erudito.domain.model.Collection
 import com.example.erudito.presentation.components.CollectionCard
 import com.example.erudito.presentation.components.CreateEditCollectionDialog
 import com.example.erudito.presentation.components.DeleteConfirmationDialog
 import com.example.erudito.presentation.components.EmptyStateView
 import com.example.erudito.presentation.components.EruditoTopAppBar
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.launch
 
 @Composable
 fun CollectionsScreen(
@@ -43,23 +48,69 @@ fun CollectionsScreen(
     modifier: Modifier = Modifier
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    val snackbarHostState = remember { SnackbarHostState() }
 
     BackHandler {
         onNavigateBack()
     }
 
-    LaunchedEffect(uiState.userFeedbackMessage) {
-        uiState.userFeedbackMessage?.let { message ->
-            snackbarHostState.showSnackbar(message)
-            viewModel.clearFeedbackMessage()
+    CollectionsScreenContent(
+        uiState = uiState,
+        onNavigateBack = onNavigateBack,
+        onNavigateToCollectionDetail = onNavigateToCollectionDetail,
+        onOpenCreateDialog = { viewModel.openCreateDialog() },
+        onCloseCreateDialog = { viewModel.closeCreateDialog() },
+        onCreateCollection = { viewModel.createCollection(it) },
+        onOpenRenameDialog = { viewModel.openRenameDialog(it) },
+        onCloseRenameDialog = { viewModel.closeRenameDialog() },
+        onRenameCollection = { id, newName -> viewModel.renameCollection(id, newName) },
+        onOpenDeleteDialog = { viewModel.openDeleteDialog(it) },
+        onCloseDeleteDialog = { viewModel.closeDeleteDialog() },
+        onDeleteCollection = { viewModel.deleteCollection(it) },
+        onClearError = { viewModel.clearFeedbackMessage() },
+        feedbackEvents = viewModel.feedbackEvents,
+        modifier = modifier
+    )
+}
+
+@Composable
+fun CollectionsScreenContent(
+    uiState: CollectionsUiState,
+    onNavigateBack: () -> Unit,
+    onNavigateToCollectionDetail: (Long) -> Unit,
+    onOpenCreateDialog: () -> Unit,
+    onCloseCreateDialog: () -> Unit,
+    onCreateCollection: (String) -> Unit,
+    onOpenRenameDialog: (Collection) -> Unit,
+    onCloseRenameDialog: () -> Unit,
+    onRenameCollection: (Long, String) -> Unit,
+    onOpenDeleteDialog: (Collection) -> Unit,
+    onCloseDeleteDialog: () -> Unit,
+    onDeleteCollection: (Long) -> Unit,
+    modifier: Modifier = Modifier,
+    onClearError: () -> Unit = {},
+    feedbackEvents: Flow<String> = emptyFlow()
+) {
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(feedbackEvents) {
+        var activeSnackbarJob: Job? = null
+        feedbackEvents.collect { message ->
+            activeSnackbarJob?.cancel()
+            snackbarHostState.currentSnackbarData?.dismiss()
+            activeSnackbarJob = launch {
+                snackbarHostState.showSnackbar(message)
+            }
         }
     }
 
     LaunchedEffect(uiState.errorMessage) {
         uiState.errorMessage?.let { error ->
-            snackbarHostState.showSnackbar(error)
-            viewModel.clearFeedbackMessage()
+            try {
+                snackbarHostState.currentSnackbarData?.dismiss()
+                snackbarHostState.showSnackbar(error)
+            } finally {
+                onClearError()
+            }
         }
     }
 
@@ -73,7 +124,7 @@ fun CollectionsScreen(
         },
         floatingActionButton = {
             FloatingActionButton(
-                onClick = { viewModel.openCreateDialog() },
+                onClick = onOpenCreateDialog,
                 containerColor = MaterialTheme.colorScheme.primary,
                 contentColor = MaterialTheme.colorScheme.onPrimary,
                 modifier = Modifier.testTag("create_collection_fab")
@@ -102,7 +153,7 @@ fun CollectionsScreen(
                 title = "Nenhuma coleção encontrada",
                 description = "Você ainda não possui coleções personalizadas. Crie uma para agrupar seus artigos salvos.",
                 actionButtonText = "Criar Coleção",
-                onActionClick = { viewModel.openCreateDialog() },
+                onActionClick = onOpenCreateDialog,
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(innerPadding)
@@ -122,8 +173,8 @@ fun CollectionsScreen(
                     CollectionCard(
                         collection = collection,
                         onClick = { onNavigateToCollectionDetail(collection.id) },
-                        onRenameClick = { viewModel.openRenameDialog(collection) },
-                        onDeleteClick = { viewModel.openDeleteDialog(collection) }
+                        onRenameClick = { onOpenRenameDialog(collection) },
+                        onDeleteClick = { onOpenDeleteDialog(collection) }
                     )
                 }
 
@@ -138,10 +189,8 @@ fun CollectionsScreen(
         CreateEditCollectionDialog(
             initialName = "",
             isEditing = false,
-            onDismiss = { viewModel.closeCreateDialog() },
-            onConfirm = { name ->
-                viewModel.createCollection(name)
-            }
+            onDismiss = onCloseCreateDialog,
+            onConfirm = onCreateCollection
         )
     }
 
@@ -149,9 +198,9 @@ fun CollectionsScreen(
         CreateEditCollectionDialog(
             initialName = col.name,
             isEditing = true,
-            onDismiss = { viewModel.closeRenameDialog() },
+            onDismiss = onCloseRenameDialog,
             onConfirm = { newName ->
-                viewModel.renameCollection(col.id, newName)
+                onRenameCollection(col.id, newName)
             }
         )
     }
@@ -159,9 +208,9 @@ fun CollectionsScreen(
     uiState.collectionToDelete?.let { col ->
         DeleteConfirmationDialog(
             collectionName = col.name,
-            onDismiss = { viewModel.closeDeleteDialog() },
+            onDismiss = onCloseDeleteDialog,
             onConfirm = {
-                viewModel.deleteCollection(col.id)
+                onDeleteCollection(col.id)
             }
         )
     }

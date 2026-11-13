@@ -1,7 +1,7 @@
 package com.example.erudito.presentation.navigation
 
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
@@ -18,6 +18,8 @@ import com.example.erudito.presentation.collections.CollectionsViewModel
 import com.example.erudito.presentation.home.HomeScreen
 import com.example.erudito.presentation.home.HomeViewModel
 
+private const val COLLECTION_FEEDBACK_RESULT_KEY = "collection_feedback_result"
+
 @Composable
 fun EruditoNavHost(
     navController: NavHostController,
@@ -28,8 +30,19 @@ fun EruditoNavHost(
         startDestination = Screen.Home.route,
         modifier = modifier
     ) {
-        composable(route = Screen.Home.route) {
+        composable(route = Screen.Home.route) { backStackEntry ->
             val homeViewModel: HomeViewModel = hiltViewModel()
+
+            LaunchedEffect(backStackEntry) {
+                backStackEntry.savedStateHandle
+                    .getStateFlow<String?>(COLLECTION_FEEDBACK_RESULT_KEY, null)
+                    .collect { message ->
+                        if (message != null) {
+                            backStackEntry.savedStateHandle.remove<String>(COLLECTION_FEEDBACK_RESULT_KEY)
+                            homeViewModel.showFeedbackMessage(message)
+                        }
+                    }
+            }
 
             HomeScreen(
                 viewModel = homeViewModel,
@@ -45,8 +58,19 @@ fun EruditoNavHost(
             )
         }
 
-        composable(route = Screen.Collections.route) {
+        composable(route = Screen.Collections.route) { backStackEntry ->
             val collectionsViewModel: CollectionsViewModel = hiltViewModel()
+
+            LaunchedEffect(backStackEntry) {
+                backStackEntry.savedStateHandle
+                    .getStateFlow<String?>(COLLECTION_FEEDBACK_RESULT_KEY, null)
+                    .collect { message ->
+                        if (message != null) {
+                            backStackEntry.savedStateHandle.remove<String>(COLLECTION_FEEDBACK_RESULT_KEY)
+                            collectionsViewModel.showFeedbackMessage(message)
+                        }
+                    }
+            }
 
             CollectionsScreen(
                 viewModel = collectionsViewModel,
@@ -70,6 +94,12 @@ fun EruditoNavHost(
             CollectionDetailScreen(
                 viewModel = collectionDetailViewModel,
                 onNavigateBack = {
+                    navController.popBackStack()
+                },
+                onCollectionDeleted = { deletedMessage ->
+                    navController.previousBackStackEntry
+                        ?.savedStateHandle
+                        ?.set(COLLECTION_FEEDBACK_RESULT_KEY, deletedMessage)
                     navController.popBackStack()
                 },
                 onNavigateToArticleDetail = { articleId ->

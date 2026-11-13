@@ -2,6 +2,7 @@ package com.example.erudito.data.local
 
 import android.content.Context
 import androidx.room.Room
+import androidx.room.withTransaction
 import androidx.test.core.app.ApplicationProvider
 import com.example.erudito.data.local.dao.ArticleDao
 import com.example.erudito.data.local.dao.CollectionDao
@@ -9,8 +10,11 @@ import com.example.erudito.data.local.database.EruditoDatabase
 import com.example.erudito.data.local.entity.ArticleEntity
 import com.example.erudito.data.local.entity.CollectionArticleCrossRef
 import com.example.erudito.data.local.entity.CollectionEntity
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -172,5 +176,61 @@ class RoomDatabaseIntegrationTest {
 
         assertNotNull(found)
         assertEquals(2, found?.articleCount)
+    }
+
+    @Test
+    fun databaseCallbackPopulatesInitialSeedAtomicallyWithoutDuplicates() = runTest {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        lateinit var seededDb: EruditoDatabase
+        seededDb = Room.inMemoryDatabaseBuilder(context, EruditoDatabase::class.java)
+            .addCallback(
+                EruditoDatabase.DatabaseCallback(
+                    ioDispatcher = Dispatchers.IO,
+                    databaseProvider = { seededDb }
+                )
+            )
+            .build()
+
+        try {
+            // Dispara abertura do banco e aguarda a conclusão da transação em background do seed
+            val collections = withContext(Dispatchers.Default) {
+                withTimeout(5_000L) {
+                    seededDb.collectionDao().getAllCollectionsWithCount().first { it.size == 3 }
+                }
+            }
+            val articles = withContext(Dispatchers.Default) {
+                withTimeout(5_000L) {
+                    seededDb.articleDao().getAllArticles().first { it.size == 3 }
+                }
+            }
+
+            assertEquals(3, collections.size)
+            assertEquals(3, articles.size)
+
+            val philosophyCollection = collections.first { it.collection.name == "Filosofia & Pensamento Clássico" }
+            assertEquals(2, philosophyCollection.articleCount)
+
+            // Garante idempotência: nova execução do seed não deve duplicar registros
+            EruditoDatabase.populateInitialLibrary(seededDb)
+            assertEquals(3, seededDb.collectionDao().getCollectionCount())
+            assertEquals(3, seededDb.articleDao().getArticleCount())
+        } finally {
+            seededDb.close()
+        }
+    }
+
+    @Test
+    fun databaseTransactionRollsBackPartialSeedOnFailure() = runTest {
+        try {
+            database.withTransaction {
+                collectionDao.insertCollection(CollectionEntity(name = "Coleção Parcial"))
+                throw IllegalStateException("Falha simulada no meio do seed")
+            }
+        } catch (_: IllegalStateException) {
+            // Esperado
+        }
+
+        assertEquals(0, collectionDao.getCollectionCount())
+        assertEquals(0, articleDao.getArticleCount())
     }
 }

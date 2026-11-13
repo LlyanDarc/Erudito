@@ -4,14 +4,17 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.room.withTransaction
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.example.erudito.data.local.dao.ArticleDao
 import com.example.erudito.data.local.dao.CollectionDao
 import com.example.erudito.data.local.entity.ArticleEntity
 import com.example.erudito.data.local.entity.CollectionArticleCrossRef
 import com.example.erudito.data.local.entity.CollectionEntity
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 
 @Database(
@@ -27,6 +30,20 @@ abstract class EruditoDatabase : RoomDatabase() {
 
     abstract fun collectionDao(): CollectionDao
     abstract fun articleDao(): ArticleDao
+
+    internal class DatabaseCallback(
+        private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+        private val databaseProvider: () -> EruditoDatabase? = { INSTANCE }
+    ) : RoomDatabase.Callback() {
+        override fun onCreate(db: SupportSQLiteDatabase) {
+            super.onCreate(db)
+            databaseProvider()?.let { database ->
+                CoroutineScope(SupervisorJob() + ioDispatcher).launch {
+                    populateInitialLibrary(database)
+                }
+            }
+        }
+    }
 
     companion object {
         @Volatile
@@ -46,19 +63,14 @@ abstract class EruditoDatabase : RoomDatabase() {
             }
         }
 
-        private class DatabaseCallback : RoomDatabase.Callback() {
-            override fun onCreate(db: SupportSQLiteDatabase) {
-                super.onCreate(db)
-                INSTANCE?.let { database ->
-                    CoroutineScope(Dispatchers.IO).launch {
-                        populateInitialLibrary(database)
-                    }
-                }
-            }
-
-            private suspend fun populateInitialLibrary(database: EruditoDatabase) {
+        internal suspend fun populateInitialLibrary(database: EruditoDatabase) {
+            database.withTransaction {
                 val collectionDao = database.collectionDao()
                 val articleDao = database.articleDao()
+
+                if (collectionDao.getCollectionCount() > 0 || articleDao.getArticleCount() > 0) {
+                    return@withTransaction
+                }
 
                 // Pre-população de coleções iniciais da biblioteca pessoal
                 val col1Id = collectionDao.insertCollection(

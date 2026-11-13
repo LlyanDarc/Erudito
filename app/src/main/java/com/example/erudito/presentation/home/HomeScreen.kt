@@ -30,10 +30,13 @@ import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -51,6 +54,10 @@ import com.example.erudito.presentation.components.CreateEditCollectionDialog
 import com.example.erudito.presentation.components.DeleteConfirmationDialog
 import com.example.erudito.presentation.components.EmptyStateView
 import com.example.erudito.presentation.components.EruditoTopAppBar
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.launch
 
 @Composable
 fun HomeScreen(
@@ -70,6 +77,8 @@ fun HomeScreen(
         onCreateCollection = { viewModel.createCollection(it) },
         onRenameCollection = { id, name -> viewModel.renameCollection(id, name) },
         onDeleteCollection = { viewModel.deleteCollection(it) },
+        onClearError = { viewModel.clearError() },
+        feedbackEvents = viewModel.feedbackEvents,
         modifier = modifier
     )
 }
@@ -83,11 +92,36 @@ fun HomeScreenContent(
     onCreateCollection: (String) -> Unit,
     onRenameCollection: (Long, String) -> Unit,
     onDeleteCollection: (Long) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onClearError: () -> Unit = {},
+    feedbackEvents: Flow<String> = emptyFlow()
 ) {
     var isCreateDialogOpen by remember { mutableStateOf(false) }
     var collectionToRename by remember { mutableStateOf<com.example.erudito.domain.model.Collection?>(null) }
     var collectionToDelete by remember { mutableStateOf<com.example.erudito.domain.model.Collection?>(null) }
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(feedbackEvents) {
+        var activeSnackbarJob: Job? = null
+        feedbackEvents.collect { message ->
+            activeSnackbarJob?.cancel()
+            snackbarHostState.currentSnackbarData?.dismiss()
+            activeSnackbarJob = launch {
+                snackbarHostState.showSnackbar(message)
+            }
+        }
+    }
+
+    LaunchedEffect(uiState.error) {
+        uiState.error?.let { error ->
+            try {
+                snackbarHostState.currentSnackbarData?.dismiss()
+                snackbarHostState.showSnackbar(error)
+            } finally {
+                onClearError()
+            }
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -133,6 +167,7 @@ fun HomeScreenContent(
                 modifier = Modifier.testTag("manage_collections_fab")
             )
         },
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         modifier = modifier
     ) { innerPadding ->
         if (uiState.isLoading) {
