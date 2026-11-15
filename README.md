@@ -9,32 +9,31 @@ O **Erudito** é um aplicativo Android desenvolvido em Kotlin e Jetpack Compose 
 | Bundle | Descrição | Status |
 |---|---|---|
 | **Bundle 1** | **Biblioteca pessoal offline** | **Concluído** |
-| Bundle 2 | Pesquisa e consulta à Wikipédia | Próximo |
-| Bundle 3 | Integração entre artigos e coleções | Planejado |
-| Bundle 4 | Offline First e sincronização | Planejado |
+| **Bundle 2** | **Pesquisa e consulta à Wikipédia** | **Concluído** |
+| **Bundle 3** | **Integração entre artigos e coleções** | **Concluído** |
+| Bundle 4 | Offline First e sincronização | Próximo |
 | Bundle 5 | Finalização, testes e validação | Planejado |
 
 ---
 
-## 2. Funcionalidades do Bundle 1 (Implementadas)
+## 2. Funcionalidades Implementadas
 
+### Bundle 1 — Biblioteca Pessoal Offline
 - **Biblioteca Pessoal Offline:** Painel inicial da biblioteca exibindo coleções, artigos salvos e indicador de status 100% offline.
-- **Gerenciamento de Coleções:**
-  - Criar coleções personalizadas com validação em tempo real (RN01: proíbe nomes vazios ou compostos apenas por espaços).
-  - Listar coleções com contador dinâmico de artigos associados.
-  - Renomear coleções existentes com validação RN01.
-  - Excluir coleções com diálogo de confirmação seguro e remoção em cascata das associações (RN05), preservando os artigos na biblioteca.
-- **Visualização de Coleções e Artigos:**
-  - Visualizar artigos associados a cada coleção com contadores e data de criação.
-  - Visualizar artigos armazenados localmente na biblioteca.
-  - Tela de leitura de artigos offline com tipografia confortável, badges de status, formatação enciclopédica e link de referência para a Wikipédia.
-- **Persistência Local com Room:**
-  - Banco de dados SQLite via Room (`erudito_database.db`) contendo as tabelas `collections`, `articles` e a tabela intermediária `collection_article_cross_ref`.
-  - Pré-população inicial com artigos clássicos e coleções para exploração imediata no primeiro lançamento.
-  - Persistência total garantida após fechar e reabrir o aplicativo.
-- **Clean Architecture & Injeção de Dependências:**
-  - Separação estrita entre camadas: **Presentation** (Compose, ViewModels, Navigation), **Domain** (Modelos puros, Use Cases, Interfaces de Repositório) e **Data** (Room DAOs, Entities, Mappers, Repositórios).
-  - Injeção de dependências com Dagger Hilt (`EruditoHiltModule`, `@AndroidEntryPoint`, `@HiltViewModel`, `@Inject`).
+- **Gerenciamento de Coleções:** Criar, listar (com contador dinâmico), renomear (validação RN01) e excluir coleções com confirmação e remoção em cascata das associações (RN05).
+- **Visualização de Coleções e Artigos:** Telas dedicadas de detalhes da coleção (`CollectionDetailScreen`) e leitura offline confortável (`ArticleDetailScreen`).
+- **Persistência Local com Room:** Banco SQLite (`erudito_database.db`) com pré-população inicial atômica e relacionamento N:N via `collection_article_cross_ref`.
+
+### Bundle 2 — Pesquisa e Consulta à Wikipédia
+- **Pesquisa na Wikipédia em Português:** Consumo da API MediaWiki (`pt.wikipedia.org`) com Retrofit + Moshi + OkHttp (`User-Agent` configurado com identificação do projeto), estados de carregamento, sucesso, ausência de resultados e tratamento de erros de rede.
+- **Leitura Online de Artigos:** Tela `WikipediaArticleScreen` exibindo título, descrição, imagem (via Coil), conteúdo completo e link de referência original na Wikipédia.
+- **Navegação Integrada:** Rotas tipadas no `EruditoNavHost` preservando estado da pesquisa ao retornar da leitura.
+
+### Bundle 3 — Integração entre Artigos e Coleções (Relação N:N)
+- **Persistência sem Duplicação (RN02, RN03, RN04):** Migração Room `v1 → v2` (`MIGRATION_1_2`) adicionando `wikipediaPageId` com índice único e reutilização transacional de registros existentes (incluindo fallback por URL para artigos legados).
+- **Seletor Reutilizável de Coleções (`CollectionPickerDialog`):** Seleção múltipla com indicação `"Já salvo"`, criação inline de novas coleções e validação contra seleção vazia.
+- **Salvamento na Leitura Online:** Associação de artigos da Wikipédia a uma ou mais coleções diretamente em `WikipediaArticleScreen` com atualização reativa imediata e feedback via Snackbar.
+- **Gerenciamento na Leitura Offline e Remoção Individual:** Reorganização de coleções diretamente em `ArticleDetailScreen` (incluindo exibição de imagem com fallback offline) e remoção individual de vínculos N:N em `CollectionDetailScreen` com diálogo de confirmação, preservando o artigo na biblioteca e nas demais coleções.
 
 ---
 
@@ -47,22 +46,27 @@ com.example.erudito/
 ├── data/
 │   ├── local/
 │   │   ├── dao/          # CollectionDao, ArticleDao
-│   │   ├── database/     # EruditoDatabase (Room)
+│   │   ├── database/     # EruditoDatabase (Room v2 + MIGRATION_1_2)
 │   │   └── entity/       # CollectionEntity, ArticleEntity, CollectionArticleCrossRef
-│   ├── mapper/           # Mapeadores entre entidades de banco e modelos de domínio
-│   └── repository/       # Implementação dos repositórios
+│   ├── mapper/           # ArticleMapper, CollectionMapper, WikipediaMapper
+│   ├── remote/
+│   │   ├── api/          # WikipediaApiService (Retrofit)
+│   │   └── dto/          # WikipediaResponseDtos (Moshi)
+│   └── repository/       # CollectionRepositoryImpl, ArticleRepositoryImpl, WikipediaRepositoryImpl
 ├── di/                   # Módulo de Injeção de Dependências Hilt (EruditoHiltModule)
 ├── domain/
-│   ├── model/            # Modelos puros: Collection, Article, CollectionWithArticles
+│   ├── model/            # Collection, Article, CollectionWithArticles, WikipediaSearchResult, WikipediaArticle, WikipediaException
 │   ├── repository/       # Interfaces dos repositórios
-│   └── usecase/          # Regras de negócio e Use Cases (Create, Rename, Delete, Get...)
+│   └── usecase/          # Use Cases (CRUD de coleções, busca/leitura Wikipédia, associação/remoção N:N)
 └── presentation/
-    ├── article_detail/   # Tela de leitura offline de artigo e ViewModel
-    ├── collection_detail/# Tela de conteúdo da coleção e ViewModel
-    ├── collections/      # Tela de gerenciamento de coleções e ViewModel
-    ├── components/       # Componentes M3: Cards, Diálogos de criação/exclusão, TopAppBar
-    ├── home/             # Painel inicial da biblioteca e ViewModel
-    └── navigation/       # Navigation Compose e rotas tipadas
+    ├── article_detail/   # Leitura offline + gerenciamento de coleções do artigo
+    ├── collection_detail/# Conteúdo da coleção + remoção individual de vínculo N:N
+    ├── collections/      # Gerenciamento de coleções
+    ├── components/       # Cards, CollectionPickerDialog, diálogos, TopAppBar, EmptyStateView
+    ├── home/             # Painel inicial da biblioteca
+    ├── navigation/       # EruditoNavHost e Screen
+    ├── search/           # Pesquisa na Wikipédia
+    └── wikipedia_article/# Leitura online + salvamento em coleções
 ```
 
 ---
@@ -72,10 +76,11 @@ com.example.erudito/
 - **Linguagem:** Kotlin 2.2.10
 - **UI:** Jetpack Compose com Material Design 3
 - **Navegação:** Navigation Compose 2.8.9
-- **Persistência Local:** Room Database 2.7.0 (com KSP)
+- **Rede & Imagens:** Retrofit 2.12.0, Moshi 1.15.2, OkHttp 4.10.0, Coil 2.7.0
+- **Persistência Local:** Room Database 2.7.0 (com KSP e `MIGRATION_1_2`)
 - **Assincronia:** Kotlin Coroutines & Flow / StateFlow
-- **Injeção de Dependências:** Hilt 2.55 (@HiltAndroidApp, @AndroidEntryPoint, @HiltViewModel, @Inject) e hilt-navigation-compose
-- **Testes Unitários:** JUnit 4, Kotlinx Coroutines Test, Robolectric 4.16.1
+- **Injeção de Dependências:** Hilt 2.55 (`@HiltAndroidApp`, `@AndroidEntryPoint`, `@HiltViewModel`, `@Inject`) e `hilt-navigation-compose`
+- **Testes:** JUnit 4, Kotlinx Coroutines Test, Robolectric 4.16.1, Compose UI Test
 
 ---
 
@@ -89,7 +94,7 @@ O aplicativo é compilado e instalado automaticamente no emulador integrado.
 # Compilar o APK de debug
 gradle assembleDebug
 
-# Executar os testes unitários
+# Executar todos os testes unitários e Robolectric
 gradle :app:testDebugUnitTest
 ```
 
@@ -97,4 +102,4 @@ gradle :app:testDebugUnitTest
 
 ## 6. Resultados de Testes
 
-Os testes unitários das regras de negócio (RN01 a RN07) foram executados e aprovados com 100% de sucesso. Consulte o arquivo `TEST_RESULTS.md` para o relatório completo.
+Todos os testes unitários, de integração Room, de UI Compose e de navegação ponta a ponta (156 testes em 30 suítes) foram executados e aprovados sem falhas ou testes ignorados. Consulte o arquivo `TEST_RESULTS.md` para o relatório completo.

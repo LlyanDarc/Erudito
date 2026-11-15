@@ -11,4 +11,10 @@ interface ArticleRepository {
     suspend fun addArticleToCollection(articleId: Long, collectionId: Long)
     suspend fun removeArticleFromCollection(articleId: Long, collectionId: Long)
     fun getArticlesForCollection(collectionId: Long): Flow<List<Article>>
+    suspend fun getArticleByWikipediaPageId(wikipediaPageId: Long): Article?
+    suspend fun getArticleByUrl(url: String): Article?
+    fun getCollectionIdsForArticle(articleId: Long): Flow<List<Long>>
+    fun getCollectionIdsForWikipediaArticle(wikipediaPageId: Long, url: String): Flow<List<Long>>
+    suspend fun saveArticleAndAssociateCollections(article: Article, collectionIds: List<Long>): Long
+    suspend fun addArticleToCollections(articleId: Long, collectionIds: List<Long>)
 }

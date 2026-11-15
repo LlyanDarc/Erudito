@@ -2,12 +2,18 @@ package com.example.erudito.presentation.navigation
 
 import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
+import androidx.lifecycle.SavedStateHandle
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.createSavedStateHandle
+import androidx.lifecycle.viewmodel.CreationExtras
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
 import com.example.erudito.domain.model.Article
@@ -18,14 +24,18 @@ import com.example.erudito.domain.model.WikipediaSearchResult
 import com.example.erudito.domain.repository.FakeArticleRepository
 import com.example.erudito.domain.repository.FakeCollectionRepository
 import com.example.erudito.domain.repository.WikipediaRepository
+import com.example.erudito.domain.usecase.AddArticleToCollectionsUseCase
 import com.example.erudito.domain.usecase.CreateCollectionUseCase
 import com.example.erudito.domain.usecase.DeleteCollectionUseCase
 import com.example.erudito.domain.usecase.GetArticleByIdUseCase
+import com.example.erudito.domain.usecase.GetCollectionIdsForArticleUseCase
 import com.example.erudito.domain.usecase.GetCollectionWithArticlesUseCase
 import com.example.erudito.domain.usecase.GetCollectionsUseCase
 import com.example.erudito.domain.usecase.GetSavedArticlesUseCase
 import com.example.erudito.domain.usecase.GetWikipediaArticleUseCase
+import com.example.erudito.domain.usecase.RemoveArticleFromCollectionUseCase
 import com.example.erudito.domain.usecase.RenameCollectionUseCase
+import com.example.erudito.domain.usecase.SaveWikipediaArticleToCollectionsUseCase
 import com.example.erudito.domain.usecase.SearchWikipediaArticlesUseCase
 import com.example.erudito.presentation.article_detail.ArticleDetailViewModel
 import com.example.erudito.presentation.collection_detail.CollectionDetailViewModel
@@ -305,7 +315,7 @@ class EruditoNavigationTest {
         EruditoNavHost(
             navController = navController,
             homeViewModelProvider = { backStackEntry ->
-                remember(backStackEntry) {
+                navViewModel(backStackEntry) {
                     HomeViewModel(
                         getCollectionsUseCase = GetCollectionsUseCase(collectionRepo),
                         getSavedArticlesUseCase = GetSavedArticlesUseCase(articleRepo),
@@ -316,7 +326,7 @@ class EruditoNavigationTest {
                 }
             },
             collectionsViewModelProvider = { backStackEntry ->
-                remember(backStackEntry) {
+                navViewModel(backStackEntry) {
                     CollectionsViewModel(
                         getCollectionsUseCase = GetCollectionsUseCase(collectionRepo),
                         createCollectionUseCase = CreateCollectionUseCase(collectionRepo),
@@ -326,36 +336,77 @@ class EruditoNavigationTest {
                 }
             },
             collectionDetailViewModelProvider = { backStackEntry ->
-                remember(backStackEntry) {
+                navViewModel(backStackEntry) { savedStateHandle ->
                     CollectionDetailViewModel(
-                        savedStateHandle = backStackEntry.savedStateHandle,
+                        savedStateHandle = savedStateHandle,
                         getCollectionWithArticlesUseCase = GetCollectionWithArticlesUseCase(collectionRepo),
                         renameCollectionUseCase = RenameCollectionUseCase(collectionRepo),
-                        deleteCollectionUseCase = DeleteCollectionUseCase(collectionRepo)
+                        deleteCollectionUseCase = DeleteCollectionUseCase(collectionRepo),
+                        removeArticleFromCollectionUseCase = RemoveArticleFromCollectionUseCase(articleRepo)
                     )
                 }
             },
             articleDetailViewModelProvider = { backStackEntry ->
-                remember(backStackEntry) {
+                navViewModel(backStackEntry) { savedStateHandle ->
                     ArticleDetailViewModel(
-                        savedStateHandle = backStackEntry.savedStateHandle,
-                        getArticleByIdUseCase = GetArticleByIdUseCase(articleRepo)
+                        savedStateHandle = savedStateHandle,
+                        getArticleByIdUseCase = GetArticleByIdUseCase(articleRepo),
+                        getCollectionsUseCase = GetCollectionsUseCase(collectionRepo),
+                        createCollectionUseCase = CreateCollectionUseCase(collectionRepo),
+                        addArticleToCollectionsUseCase = AddArticleToCollectionsUseCase(
+                            articleRepository = articleRepo,
+                            collectionRepository = collectionRepo
+                        ),
+                        removeArticleFromCollectionUseCase = RemoveArticleFromCollectionUseCase(articleRepo),
+                        getCollectionIdsForArticleUseCase = GetCollectionIdsForArticleUseCase(articleRepo)
                     )
                 }
             },
             searchViewModelProvider = { backStackEntry ->
-                remember(backStackEntry) {
+                navViewModel(backStackEntry) {
                     SearchViewModel(
                         searchWikipediaArticlesUseCase = SearchWikipediaArticlesUseCase(wikipediaRepo)
                     )
                 }
             },
             wikipediaArticleViewModelProvider = { backStackEntry ->
-                remember(backStackEntry) {
+                navViewModel(backStackEntry) { savedStateHandle ->
                     WikipediaArticleViewModel(
-                        savedStateHandle = backStackEntry.savedStateHandle,
-                        getWikipediaArticleUseCase = GetWikipediaArticleUseCase(wikipediaRepo)
+                        savedStateHandle = savedStateHandle,
+                        getWikipediaArticleUseCase = GetWikipediaArticleUseCase(wikipediaRepo),
+                        getCollectionsUseCase = GetCollectionsUseCase(collectionRepo),
+                        createCollectionUseCase = CreateCollectionUseCase(collectionRepo),
+                        getSavedArticlesUseCase = GetSavedArticlesUseCase(articleRepo),
+                        saveWikipediaArticleToCollectionsUseCase = SaveWikipediaArticleToCollectionsUseCase(
+                            articleRepository = articleRepo,
+                            collectionRepository = collectionRepo
+                        ),
+                        addArticleToCollectionsUseCase = AddArticleToCollectionsUseCase(
+                            articleRepository = articleRepo,
+                            collectionRepository = collectionRepo
+                        ),
+                        removeArticleFromCollectionUseCase = RemoveArticleFromCollectionUseCase(articleRepo),
+                        getCollectionIdsForArticleUseCase = GetCollectionIdsForArticleUseCase(articleRepo)
                     )
+                }
+            }
+        )
+    }
+
+    @Composable
+    private inline fun <reified VM : ViewModel> navViewModel(
+        backStackEntry: NavBackStackEntry,
+        crossinline create: (SavedStateHandle) -> VM
+    ): VM {
+        return viewModel(
+            viewModelStoreOwner = backStackEntry,
+            factory = object : ViewModelProvider.Factory {
+                @Suppress("UNCHECKED_CAST")
+                override fun <T : ViewModel> create(
+                    modelClass: Class<T>,
+                    extras: CreationExtras
+                ): T {
+                    return create(extras.createSavedStateHandle()) as T
                 }
             }
         )

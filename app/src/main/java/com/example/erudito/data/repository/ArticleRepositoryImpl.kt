@@ -45,4 +45,43 @@ class ArticleRepositoryImpl @Inject constructor(
             list.map { it.toDomain() }
         }
     }
+
+    override suspend fun getArticleByWikipediaPageId(wikipediaPageId: Long): Article? {
+        return articleDao.getArticleByWikipediaPageId(wikipediaPageId)?.toDomain()
+    }
+
+    override suspend fun getArticleByUrl(url: String): Article? {
+        return articleDao.getArticleByUrl(url)?.toDomain()
+    }
+
+    override fun getCollectionIdsForArticle(articleId: Long): Flow<List<Long>> {
+        return articleDao.getCollectionIdsForArticle(articleId)
+    }
+
+    override fun getCollectionIdsForWikipediaArticle(
+        wikipediaPageId: Long,
+        url: String
+    ): Flow<List<Long>> {
+        return articleDao.getCollectionIdsForWikipediaArticle(
+            wikipediaPageId = wikipediaPageId,
+            url = url
+        )
+    }
+
+    override suspend fun saveArticleAndAssociateCollections(
+        article: Article,
+        collectionIds: List<Long>
+    ): Long {
+        return articleDao.saveArticleAndAssociateCollections(
+            article = article.toEntity(),
+            collectionIds = collectionIds
+        )
+    }
+
+    override suspend fun addArticleToCollections(articleId: Long, collectionIds: List<Long>) {
+        articleDao.addArticleToCollections(
+            articleId = articleId,
+            collectionIds = collectionIds
+        )
+    }
 }

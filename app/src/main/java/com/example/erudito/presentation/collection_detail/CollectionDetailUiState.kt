@@ -1,5 +1,6 @@
 package com.example.erudito.presentation.collection_detail
 
+import com.example.erudito.domain.model.Article
 import com.example.erudito.domain.model.CollectionWithArticles
 
 data class CollectionDetailUiState(
@@ -10,5 +11,7 @@ data class CollectionDetailUiState(
     val isDeleting: Boolean = false,
     val isDeleted: Boolean = false,
     val deletedCollectionName: String? = null,
+    val articleToRemove: Article? = null,
+    val isRemovingArticle: Boolean = false,
     val errorMessage: String? = null
 )

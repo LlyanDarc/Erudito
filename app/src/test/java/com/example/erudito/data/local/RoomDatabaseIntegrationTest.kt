@@ -1,6 +1,9 @@
 package com.example.erudito.data.local
 
 import android.content.Context
+import android.database.sqlite.SQLiteConstraintException
+import android.database.sqlite.SQLiteDatabase
+import android.database.sqlite.SQLiteOpenHelper
 import androidx.room.Room
 import androidx.room.withTransaction
 import androidx.test.core.app.ApplicationProvider
@@ -20,6 +23,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.junit.Assert.fail
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -206,6 +210,7 @@ class RoomDatabaseIntegrationTest {
 
             assertEquals(3, collections.size)
             assertEquals(3, articles.size)
+            assertTrue(articles.all { it.wikipediaPageId == null })
 
             val philosophyCollection = collections.first { it.collection.name == "Filosofia & Pensamento Clássico" }
             assertEquals(2, philosophyCollection.articleCount)
@@ -232,5 +237,371 @@ class RoomDatabaseIntegrationTest {
 
         assertEquals(0, collectionDao.getCollectionCount())
         assertEquals(0, articleDao.getArticleCount())
+    }
+
+    @Test
+    fun migration1To2PreservesCollectionsArticlesCrossRefsAndNullWikipediaPageIds() = runTest {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val dbName = "migration_1_2_test_${System.nanoTime()}.db"
+        context.deleteDatabase(dbName)
+
+        // 1. Cria banco exatamente no schema v1 com dados legados
+        val v1Helper = object : SQLiteOpenHelper(context, dbName, null, 1) {
+            override fun onCreate(db: SQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `collections` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `name` TEXT NOT NULL,
+                        `createdAt` INTEGER NOT NULL
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `articles` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `title` TEXT NOT NULL,
+                        `url` TEXT NOT NULL,
+                        `description` TEXT,
+                        `content` TEXT,
+                        `imageUrl` TEXT,
+                        `lastUpdated` INTEGER NOT NULL
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `collection_article_cross_ref` (
+                        `collectionId` INTEGER NOT NULL,
+                        `articleId` INTEGER NOT NULL,
+                        PRIMARY KEY(`collectionId`, `articleId`),
+                        FOREIGN KEY(`collectionId`) REFERENCES `collections`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE,
+                        FOREIGN KEY(`articleId`) REFERENCES `articles`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_collection_article_cross_ref_collectionId` ON `collection_article_cross_ref` (`collectionId`)"
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_collection_article_cross_ref_articleId` ON `collection_article_cross_ref` (`articleId`)"
+                )
+
+                db.execSQL("INSERT INTO collections (id, name, createdAt) VALUES (1, 'Filosofia', 1000)")
+                db.execSQL("INSERT INTO collections (id, name, createdAt) VALUES (2, 'História', 2000)")
+                db.execSQL(
+                    """
+                    INSERT INTO articles (id, title, url, description, content, imageUrl, lastUpdated)
+                    VALUES (10, 'Filosofia Grega', 'https://pt.wikipedia.org/wiki/Filosofia_grega', 'Origens', 'Conteúdo clássico', NULL, 3000)
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    """
+                    INSERT INTO articles (id, title, url, description, content, imageUrl, lastUpdated)
+                    VALUES (11, 'Renascimento', 'https://pt.wikipedia.org/wiki/Renascimento', 'Humanismo', 'Conteúdo renascentista', NULL, 4000)
+                    """.trimIndent()
+                )
+                db.execSQL("INSERT INTO collection_article_cross_ref (collectionId, articleId) VALUES (1, 10)")
+                db.execSQL("INSERT INTO collection_article_cross_ref (collectionId, articleId) VALUES (1, 11)")
+                db.execSQL("INSERT INTO collection_article_cross_ref (collectionId, articleId) VALUES (2, 11)")
+            }
+
+            override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) = Unit
+        }
+
+        v1Helper.writableDatabase.close()
+        v1Helper.close()
+
+        // 2. Abre com Room v2 executando MIGRATION_1_2 e validação de schema
+        val migratedDb = Room.databaseBuilder(context, EruditoDatabase::class.java, dbName)
+            .addMigrations(EruditoDatabase.MIGRATION_1_2)
+            .allowMainThreadQueries()
+            .build()
+
+        try {
+            val migratedCollectionDao = migratedDb.collectionDao()
+            val migratedArticleDao = migratedDb.articleDao()
+
+            val collections = migratedCollectionDao.getAllCollectionsWithCount().first()
+            assertEquals(2, collections.size)
+            assertEquals(2, collections.first { it.collection.id == 1L }.articleCount)
+            assertEquals(1, collections.first { it.collection.id == 2L }.articleCount)
+
+            val articles = migratedArticleDao.getAllArticles().first()
+            assertEquals(2, articles.size)
+            assertTrue(articles.all { it.wikipediaPageId == null })
+
+            val colIdsArt11 = migratedArticleDao.getCollectionIdsForArticle(11L).first().toSet()
+            assertEquals(setOf(1L, 2L), colIdsArt11)
+
+            // Fallback por URL deve enxergar as coleções do artigo migrado com wikipediaPageId NULL
+            val observedViaWikiFallback = migratedArticleDao.getCollectionIdsForWikipediaArticle(
+                wikipediaPageId = 9876L,
+                url = "https://pt.wikipedia.org/wiki/Renascimento"
+            ).first().toSet()
+            assertEquals(setOf(1L, 2L), observedViaWikiFallback)
+        } finally {
+            migratedDb.close()
+            context.deleteDatabase(dbName)
+        }
+    }
+
+    @Test
+    fun uniqueIndexAllowsMultipleNullWikipediaPageIdsButRejectsDuplicateNonNullPageId() = runTest {
+        articleDao.insertArticle(
+            ArticleEntity(
+                title = "Legado 1",
+                url = "https://pt.wikipedia.org/wiki/Legado_1",
+                description = null,
+                content = null,
+                imageUrl = null,
+                wikipediaPageId = null
+            )
+        )
+        articleDao.insertArticle(
+            ArticleEntity(
+                title = "Legado 2",
+                url = "https://pt.wikipedia.org/wiki/Legado_2",
+                description = null,
+                content = null,
+                imageUrl = null,
+                wikipediaPageId = null
+            )
+        )
+        articleDao.insertArticle(
+            ArticleEntity(
+                title = "Wiki A",
+                url = "https://pt.wikipedia.org/wiki/Wiki_A",
+                description = null,
+                content = null,
+                imageUrl = null,
+                wikipediaPageId = 500L
+            )
+        )
+
+        assertEquals(3, articleDao.getArticleCount())
+
+        try {
+            database.openHelper.writableDatabase.execSQL(
+                """
+                INSERT INTO articles (title, url, description, content, imageUrl, lastUpdated, wikipediaPageId)
+                VALUES ('Wiki Duplicado', 'https://pt.wikipedia.org/wiki/Outro', NULL, NULL, NULL, 1000, 500)
+                """.trimIndent()
+            )
+            fail("Índice único de wikipediaPageId deveria impedir duplicidade não-nula")
+        } catch (_: SQLiteConstraintException) {
+            // Esperado pelo índice único
+        }
+    }
+
+    @Test
+    fun saveArticleAndAssociateCollectionsInsertsNewWikipediaArticle() = runTest {
+        val col1Id = collectionDao.insertCollection(CollectionEntity(name = "Astronomia"))
+        val col2Id = collectionDao.insertCollection(CollectionEntity(name = "Física"))
+
+        val savedId = articleDao.saveArticleAndAssociateCollections(
+            article = ArticleEntity(
+                title = "Buraco Negro",
+                url = "https://pt.wikipedia.org/wiki/Buraco_negro",
+                description = "Região do espaço-tempo",
+                content = "Conteúdo completo sobre buracos negros.",
+                imageUrl = "https://upload.wikimedia.org/blackhole.jpg",
+                lastUpdated = 12345L,
+                wikipediaPageId = 4242L
+            ),
+            collectionIds = listOf(col1Id, col2Id)
+        )
+
+        assertTrue(savedId > 0L)
+        assertEquals(1, articleDao.getArticleCount())
+
+        val stored = articleDao.getArticleByWikipediaPageId(4242L)
+        assertNotNull(stored)
+        assertEquals(savedId, stored?.id)
+        assertEquals("Buraco Negro", stored?.title)
+        assertEquals(4242L, stored?.wikipediaPageId)
+
+        val linkedCollectionIds = articleDao.getCollectionIdsForArticle(savedId).first().toSet()
+        assertEquals(setOf(col1Id, col2Id), linkedCollectionIds)
+    }
+
+    @Test
+    fun saveArticleAndAssociateCollectionsReusesExistingArticleByWikipediaPageIdAndUpdatesDataWithoutLosingAssociations() = runTest {
+        val col1Id = collectionDao.insertCollection(CollectionEntity(name = "Física"))
+        val col2Id = collectionDao.insertCollection(CollectionEntity(name = "História da Ciência"))
+
+        val firstId = articleDao.saveArticleAndAssociateCollections(
+            article = ArticleEntity(
+                title = "Albert Einstein",
+                url = "https://pt.wikipedia.org/wiki/Albert_Einstein",
+                description = "Descrição inicial",
+                content = "Texto inicial",
+                imageUrl = null,
+                lastUpdated = 1000L,
+                wikipediaPageId = 777L
+            ),
+            collectionIds = listOf(col1Id)
+        )
+
+        val secondId = articleDao.saveArticleAndAssociateCollections(
+            article = ArticleEntity(
+                title = "Albert Einstein (Atualizado)",
+                url = "https://pt.wikipedia.org/wiki/Albert_Einstein",
+                description = "Físico teórico alemão",
+                content = "Texto completo atualizado da Wikipédia",
+                imageUrl = "https://upload.wikimedia.org/einstein.jpg",
+                lastUpdated = 2000L,
+                wikipediaPageId = 777L
+            ),
+            collectionIds = listOf(col1Id, col2Id, col2Id)
+        )
+
+        assertEquals(firstId, secondId)
+        assertEquals(1, articleDao.getArticleCount())
+
+        val updated = articleDao.getArticleById(firstId)
+        assertEquals("Albert Einstein (Atualizado)", updated?.title)
+        assertEquals("Físico teórico alemão", updated?.description)
+        assertEquals("Texto completo atualizado da Wikipédia", updated?.content)
+        assertEquals("https://upload.wikimedia.org/einstein.jpg", updated?.imageUrl)
+        assertEquals(2000L, updated?.lastUpdated)
+
+        val collectionIds = articleDao.getCollectionIdsForArticle(firstId).first()
+        assertEquals(2, collectionIds.size)
+        assertEquals(setOf(col1Id, col2Id), collectionIds.toSet())
+        assertEquals(1, articleDao.getArticlesForCollection(col1Id).first().size)
+        assertEquals(1, articleDao.getArticlesForCollection(col2Id).first().size)
+    }
+
+    @Test
+    fun saveArticleAndAssociateCollectionsReusesLegacyNullPageIdArticleByUrlAndPreservesPriorAssociations() = runTest {
+        val col1Id = collectionDao.insertCollection(CollectionEntity(name = "Artes"))
+        val col2Id = collectionDao.insertCollection(CollectionEntity(name = "Filosofia"))
+
+        val legacyId = articleDao.insertArticle(
+            ArticleEntity(
+                title = "Renascimento",
+                url = "https://pt.wikipedia.org/wiki/Renascimento",
+                description = "Descrição offline antiga",
+                content = "Conteúdo antigo",
+                imageUrl = null,
+                lastUpdated = 500L,
+                wikipediaPageId = null
+            )
+        )
+        articleDao.insertCrossRef(CollectionArticleCrossRef(collectionId = col1Id, articleId = legacyId))
+
+        val reusedId = articleDao.saveArticleAndAssociateCollections(
+            article = ArticleEntity(
+                title = "Renascimento",
+                url = "https://pt.wikipedia.org/wiki/Renascimento",
+                description = "Movimento cultural europeu",
+                content = "Conteúdo atualizado da Wikipédia",
+                imageUrl = "https://upload.wikimedia.org/renascimento.jpg",
+                lastUpdated = 1500L,
+                wikipediaPageId = 9001L
+            ),
+            collectionIds = listOf(col2Id)
+        )
+
+        assertEquals(legacyId, reusedId)
+        assertEquals(1, articleDao.getArticleCount())
+
+        val updated = articleDao.getArticleById(legacyId)
+        assertEquals(9001L, updated?.wikipediaPageId)
+        assertEquals("Conteúdo atualizado da Wikipédia", updated?.content)
+        assertEquals("https://upload.wikimedia.org/renascimento.jpg", updated?.imageUrl)
+
+        val linkedCollections = articleDao.getCollectionIdsForArticle(legacyId).first().toSet()
+        assertEquals(setOf(col1Id, col2Id), linkedCollections)
+    }
+
+    @Test
+    fun legacyUrlFallbackDoesNotHijackArticleWithDifferentNonNullWikipediaPageId() = runTest {
+        val col1Id = collectionDao.insertCollection(CollectionEntity(name = "Coleção A"))
+        val col2Id = collectionDao.insertCollection(CollectionEntity(name = "Coleção B"))
+
+        val firstId = articleDao.saveArticleAndAssociateCollections(
+            article = ArticleEntity(
+                title = "Artigo 1",
+                url = "https://pt.wikipedia.org/wiki/Mesma_URL",
+                description = null,
+                content = "Texto 1",
+                imageUrl = null,
+                wikipediaPageId = 101L
+            ),
+            collectionIds = listOf(col1Id)
+        )
+
+        val secondId = articleDao.saveArticleAndAssociateCollections(
+            article = ArticleEntity(
+                title = "Artigo 2",
+                url = "https://pt.wikipedia.org/wiki/Mesma_URL",
+                description = null,
+                content = "Texto 2",
+                imageUrl = null,
+                wikipediaPageId = 202L
+            ),
+            collectionIds = listOf(col2Id)
+        )
+
+        assertTrue(firstId != secondId)
+        assertEquals(2, articleDao.getArticleCount())
+        assertEquals(listOf(col1Id), articleDao.getCollectionIdsForWikipediaArticle(101L, "https://pt.wikipedia.org/wiki/Mesma_URL").first())
+        assertEquals(listOf(col2Id), articleDao.getCollectionIdsForWikipediaArticle(202L, "https://pt.wikipedia.org/wiki/Mesma_URL").first())
+    }
+
+    @Test
+    fun removingSingleAssociationPreservesArticleAndOtherCollectionLinks() = runTest {
+        val col1Id = collectionDao.insertCollection(CollectionEntity(name = "Coleção 1"))
+        val col2Id = collectionDao.insertCollection(CollectionEntity(name = "Coleção 2"))
+
+        val articleId = articleDao.saveArticleAndAssociateCollections(
+            article = ArticleEntity(
+                title = "Sócrates",
+                url = "https://pt.wikipedia.org/wiki/S%C3%B3crates",
+                description = "Filósofo grego",
+                content = "Conteúdo",
+                imageUrl = null,
+                wikipediaPageId = 314L
+            ),
+            collectionIds = listOf(col1Id, col2Id)
+        )
+
+        articleDao.deleteCrossRef(collectionId = col1Id, articleId = articleId)
+
+        assertNotNull(articleDao.getArticleById(articleId))
+        assertTrue(articleDao.getArticlesForCollection(col1Id).first().isEmpty())
+        assertEquals(listOf(articleId), articleDao.getArticlesForCollection(col2Id).first().map { it.id })
+        assertEquals(listOf(col2Id), articleDao.getCollectionIdsForWikipediaArticle(314L, "https://pt.wikipedia.org/wiki/S%C3%B3crates").first())
+    }
+
+    @Test
+    fun saveArticleAndAssociateCollectionsRollsBackCompletelyWhenAnyCollectionDoesNotExist() = runTest {
+        val validColId = collectionDao.insertCollection(CollectionEntity(name = "Válida"))
+        val nonExistentColId = 9999L
+
+        try {
+            articleDao.saveArticleAndAssociateCollections(
+                article = ArticleEntity(
+                    title = "Artigo Abortado",
+                    url = "https://pt.wikipedia.org/wiki/Artigo_abortado",
+                    description = "Desc",
+                    content = "Conteúdo",
+                    imageUrl = null,
+                    wikipediaPageId = 5555L
+                ),
+                collectionIds = listOf(validColId, nonExistentColId)
+            )
+            fail("Deveria falhar quando alguma coleção não existe")
+        } catch (_: IllegalArgumentException) {
+            // Esperado
+        }
+
+        // Rollback atômico: nem o artigo nem a associação com a coleção válida podem ter sido gravados
+        assertEquals(0, articleDao.getArticleCount())
+        assertNull(articleDao.getArticleByWikipediaPageId(5555L))
+        assertTrue(articleDao.getArticlesForCollection(validColId).first().isEmpty())
     }
 }

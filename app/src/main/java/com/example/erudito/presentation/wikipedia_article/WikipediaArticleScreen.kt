@@ -20,20 +20,27 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
+import androidx.compose.material.icons.filled.BookmarkAdd
+import androidx.compose.material.icons.filled.BookmarkAdded
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.WifiOff
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -52,8 +59,13 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
+import com.example.erudito.presentation.components.CollectionPickerDialog
 import com.example.erudito.presentation.components.EmptyStateView
 import com.example.erudito.presentation.components.EruditoTopAppBar
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.launch
 
 @Composable
 fun WikipediaArticleScreen(
@@ -62,6 +74,7 @@ fun WikipediaArticleScreen(
     modifier: Modifier = Modifier
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val collectionsUiState by viewModel.collectionsUiState.collectAsStateWithLifecycle()
     val uriHandler = LocalUriHandler.current
 
     BackHandler {
@@ -75,6 +88,13 @@ fun WikipediaArticleScreen(
         onOpenOriginalUrl = { url ->
             runCatching { uriHandler.openUri(url) }
         },
+        collectionsUiState = collectionsUiState,
+        onOpenCollectionPicker = { viewModel.openCollectionPicker() },
+        onDismissCollectionPicker = { viewModel.dismissCollectionPicker() },
+        onToggleCollectionSelection = { viewModel.toggleCollectionSelection(it) },
+        onCreateCollection = { viewModel.createCollection(it) },
+        onConfirmCollectionSelection = { viewModel.confirmCollectionSelection() },
+        feedbackEvents = viewModel.feedbackEvents,
         modifier = modifier
     )
 }
@@ -85,9 +105,30 @@ fun WikipediaArticleScreenContent(
     onNavigateBack: () -> Unit,
     onRetry: () -> Unit,
     onOpenOriginalUrl: (String) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    collectionsUiState: WikipediaArticleCollectionsUiState = WikipediaArticleCollectionsUiState(
+        isLoadingCollections = false
+    ),
+    onOpenCollectionPicker: () -> Unit = {},
+    onDismissCollectionPicker: () -> Unit = {},
+    onToggleCollectionSelection: (Long) -> Unit = {},
+    onCreateCollection: (String) -> Unit = {},
+    onConfirmCollectionSelection: () -> Unit = {},
+    feedbackEvents: Flow<String> = emptyFlow()
 ) {
     val scrollState = rememberScrollState()
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(feedbackEvents) {
+        var activeSnackbarJob: Job? = null
+        feedbackEvents.collect { message ->
+            activeSnackbarJob?.cancel()
+            snackbarHostState.currentSnackbarData?.dismiss()
+            activeSnackbarJob = launch {
+                snackbarHostState.showSnackbar(message)
+            }
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -96,6 +137,9 @@ fun WikipediaArticleScreenContent(
                 canNavigateBack = true,
                 onNavigateBack = onNavigateBack
             )
+        },
+        snackbarHost = {
+            SnackbarHost(hostState = snackbarHostState)
         },
         modifier = modifier
     ) { innerPadding ->
@@ -264,6 +308,77 @@ fun WikipediaArticleScreenContent(
                             }
 
                             Spacer(modifier = Modifier.height(16.dp))
+
+                            if (collectionsUiState.isSaved) {
+                                val savedLabel = if (collectionsUiState.savedCollectionsCount == 1) {
+                                    "Salvo em 1 coleção"
+                                } else {
+                                    "Salvo em ${collectionsUiState.savedCollectionsCount} coleções"
+                                }
+                                Surface(
+                                    shape = RoundedCornerShape(10.dp),
+                                    color = MaterialTheme.colorScheme.secondaryContainer,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .testTag("wikipedia_article_saved_status")
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.BookmarkAdded,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(
+                                            text = savedLabel,
+                                            style = MaterialTheme.typography.labelLarge.copy(
+                                                fontWeight = FontWeight.SemiBold
+                                            ),
+                                            color = MaterialTheme.colorScheme.onSecondaryContainer
+                                        )
+                                    }
+                                }
+                                Spacer(modifier = Modifier.height(10.dp))
+                                FilledTonalButton(
+                                    onClick = onOpenCollectionPicker,
+                                    shape = RoundedCornerShape(12.dp),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .heightIn(min = 48.dp)
+                                        .testTag("wikipedia_article_save_button")
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.BookmarkAdded,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("Gerenciar coleções")
+                                }
+                            } else {
+                                Button(
+                                    onClick = onOpenCollectionPicker,
+                                    shape = RoundedCornerShape(12.dp),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .heightIn(min = 48.dp)
+                                        .testTag("wikipedia_article_save_button")
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.BookmarkAdd,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("Salvar em coleções")
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(16.dp))
                             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                             Spacer(modifier = Modifier.height(20.dp))
 
@@ -354,6 +469,23 @@ fun WikipediaArticleScreenContent(
 
                             Spacer(modifier = Modifier.height(32.dp))
                         }
+                    }
+
+                    if (collectionsUiState.isPickerVisible) {
+                        CollectionPickerDialog(
+                            collections = collectionsUiState.availableCollections,
+                            selectedCollectionIds = collectionsUiState.selectedCollectionIds,
+                            initiallyAssociatedIds = collectionsUiState.savedCollectionIds,
+                            onToggleCollection = onToggleCollectionSelection,
+                            onCreateCollection = onCreateCollection,
+                            onConfirm = onConfirmCollectionSelection,
+                            onDismiss = onDismissCollectionPicker,
+                            isLoadingCollections = collectionsUiState.isLoadingCollections,
+                            isSaving = collectionsUiState.isSaving,
+                            isCreatingCollection = collectionsUiState.isCreatingCollection,
+                            errorMessage = collectionsUiState.pickerErrorMessage,
+                            articleTitle = article.title
+                        )
                     }
                 }
             }

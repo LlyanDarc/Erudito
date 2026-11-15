@@ -3,11 +3,14 @@ package com.example.erudito.presentation.collection_detail
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.erudito.domain.model.Article
 import com.example.erudito.domain.usecase.DeleteCollectionUseCase
 import com.example.erudito.domain.usecase.GetCollectionWithArticlesUseCase
+import com.example.erudito.domain.usecase.RemoveArticleFromCollectionUseCase
 import com.example.erudito.domain.usecase.RenameCollectionUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -23,7 +26,8 @@ class CollectionDetailViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val getCollectionWithArticlesUseCase: GetCollectionWithArticlesUseCase,
     private val renameCollectionUseCase: RenameCollectionUseCase,
-    private val deleteCollectionUseCase: DeleteCollectionUseCase
+    private val deleteCollectionUseCase: DeleteCollectionUseCase,
+    private val removeArticleFromCollectionUseCase: RemoveArticleFromCollectionUseCase
 ) : ViewModel() {
 
     val collectionId: Long = savedStateHandle.get<Long>("collectionId")
@@ -120,6 +124,49 @@ class CollectionDetailViewModel @Inject constructor(
                     it.copy(
                         isDeleting = false,
                         errorMessage = e.message ?: "Erro ao excluir coleção"
+                    )
+                }
+            }
+        }
+    }
+
+    fun openRemoveArticleDialog(article: Article) {
+        if (_uiState.value.isRemovingArticle) return
+        _uiState.update { it.copy(articleToRemove = article) }
+    }
+
+    fun closeRemoveArticleDialog() {
+        if (_uiState.value.isRemovingArticle) return
+        _uiState.update { it.copy(articleToRemove = null) }
+    }
+
+    fun confirmRemoveArticle() {
+        val article = _uiState.value.articleToRemove ?: return
+        if (_uiState.value.isRemovingArticle) return
+
+        _uiState.update {
+            it.copy(
+                isRemovingArticle = true,
+                articleToRemove = null
+            )
+        }
+
+        viewModelScope.launch {
+            try {
+                removeArticleFromCollectionUseCase(
+                    articleId = article.id,
+                    collectionId = collectionId
+                )
+                _uiState.update { it.copy(isRemovingArticle = false) }
+                _feedbackEvents.send("Artigo \"${article.title}\" removido da coleção.")
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _uiState.update {
+                    it.copy(
+                        isRemovingArticle = false,
+                        errorMessage = e.message?.takeIf { msg -> msg.isNotBlank() }
+                            ?: "Erro ao remover artigo da coleção"
                     )
                 }
             }

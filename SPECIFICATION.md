@@ -66,22 +66,22 @@ As seguintes funcionalidades permanecem disponíveis sem conexão com a internet
 
 ## 6. Requisitos funcionais
 
-| Código | Requisito | Status Bundle 1 |
+| Código | Requisito | Status Atual (Bundles 1–3) |
 |---|---|---|
-| RF01 | O sistema deve permitir pesquisar artigos na Wikipédia. | Planejado (Bundle 2) |
-| RF02 | O sistema deve apresentar os resultados da pesquisa. | Planejado (Bundle 2) |
-| RF03 | O sistema deve permitir consultar o conteúdo de um artigo. | Implementado (Offline) |
-| RF04 | O sistema deve permitir criar coleções personalizadas. | **Implementado** |
-| RF05 | O sistema deve permitir renomear coleções. | **Implementado** |
-| RF06 | O sistema deve permitir excluir coleções. | **Implementado** |
-| RF07 | O sistema deve permitir adicionar artigos às coleções. | Implementado no Data/Room |
-| RF08 | O sistema deve permitir remover artigos das coleções. | Implementado no Data/Room |
-| RF09 | O sistema deve permitir que um artigo pertença a várias coleções. | **Implementado** |
-| RF10 | O sistema deve impedir artigos duplicados na mesma coleção. | **Implementado** |
-| RF11 | O sistema deve armazenar localmente os artigos salvos. | **Implementado** |
-| RF12 | O sistema deve permitir consultar coleções e artigos salvos offline. | **Implementado** |
+| RF01 | O sistema deve permitir pesquisar artigos na Wikipédia. | **Implementado** (Bundle 2) |
+| RF02 | O sistema deve apresentar os resultados da pesquisa. | **Implementado** (Bundle 2) |
+| RF03 | O sistema deve permitir consultar o conteúdo de um artigo. | **Implementado** (Online e Offline — Bundles 1 e 2) |
+| RF04 | O sistema deve permitir criar coleções personalizadas. | **Implementado** (Bundle 1 e criação inline no Bundle 3) |
+| RF05 | O sistema deve permitir renomear coleções. | **Implementado** (Bundle 1) |
+| RF06 | O sistema deve permitir excluir coleções. | **Implementado** (Bundle 1) |
+| RF07 | O sistema deve permitir adicionar artigos às coleções. | **Implementado** (Bundle 3 — Online e Offline) |
+| RF08 | O sistema deve permitir remover artigos das coleções. | **Implementado** (Bundle 3 — Coleção e Leitura) |
+| RF09 | O sistema deve permitir que um artigo pertença a várias coleções. | **Implementado** (Bundle 1 e Bundle 3) |
+| RF10 | O sistema deve impedir artigos duplicados na mesma coleção. | **Implementado** (Bundle 1 e Bundle 3) |
+| RF11 | O sistema deve armazenar localmente os artigos salvos. | **Implementado** (Bundle 1 e Bundle 3) |
+| RF12 | O sistema deve permitir consultar coleções e artigos salvos offline. | **Implementado** (Bundle 1 e Bundle 3) |
 | RF13 | O sistema deve atualizar conteúdos armazenados quando houver conexão. | Planejado (Bundle 4) |
-| RF14 | O sistema deve informar o usuário sobre situações de carregamento, ausência de resultados e erros. | **Implementado** |
+| RF14 | O sistema deve informar o usuário sobre situações de carregamento, ausência de resultados e erros. | **Implementado** (Bundles 1, 2 e 3) |
 
 ## 7. Regras de negócio
 

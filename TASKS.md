@@ -67,33 +67,33 @@ A implementação deverá ocorrer progressivamente, com revisão, validação e 
 
 ### Tarefas
 
-- [ ] Configurar Retrofit.
-- [ ] Implementar o serviço de comunicação com a API MediaWiki.
-- [ ] Criar DTOs para os dados recebidos.
-- [ ] Implementar os mapeadores necessários.
-- [ ] Implementar a integração com os repositórios.
-- [ ] Implementar o caso de uso de pesquisa.
-- [ ] Implementar o caso de uso de consulta de artigo.
-- [ ] Criar a tela de pesquisa.
-- [ ] Implementar o campo de pesquisa.
-- [ ] Exibir os resultados encontrados.
-- [ ] Apresentar títulos e descrições.
-- [ ] Apresentar imagens quando disponíveis.
-- [ ] Criar a tela de leitura do artigo.
-- [ ] Implementar a exibição do conteúdo.
-- [ ] Implementar referência para o artigo original na Wikipédia.
-- [ ] Implementar estados de carregamento, sucesso, ausência de resultados e erro.
-- [ ] Implementar tratamento de falhas de comunicação.
-- [ ] Integrar as telas à navegação existente.
+- [x] Configurar Retrofit.
+- [x] Implementar o serviço de comunicação com a API MediaWiki.
+- [x] Criar DTOs para os dados recebidos.
+- [x] Implementar os mapeadores necessários.
+- [x] Implementar a integração com os repositórios.
+- [x] Implementar o caso de uso de pesquisa.
+- [x] Implementar o caso de uso de consulta de artigo.
+- [x] Criar a tela de pesquisa.
+- [x] Implementar o campo de pesquisa.
+- [x] Exibir os resultados encontrados.
+- [x] Apresentar títulos e descrições.
+- [x] Apresentar imagens quando disponíveis.
+- [x] Criar a tela de leitura do artigo.
+- [x] Implementar a exibição do conteúdo.
+- [x] Implementar referência para o artigo original na Wikipédia.
+- [x] Implementar estados de carregamento, sucesso, ausência de resultados e erro.
+- [x] Implementar tratamento de falhas de comunicação.
+- [x] Integrar as telas à navegação existente.
 
 ### Critérios de conclusão
 
-- O usuário deve conseguir pesquisar artigos.
-- Os resultados devem ser apresentados corretamente.
-- O usuário deve conseguir abrir e consultar os artigos.
-- Imagens e descrições devem ser exibidas quando disponíveis.
-- Falhas de conexão não devem provocar crashes previsíveis.
-- Os estados da interface devem representar corretamente o resultado das operações.
+- [x] O usuário deve conseguir pesquisar artigos.
+- [x] Os resultados devem ser apresentados corretamente.
+- [x] O usuário deve conseguir abrir e consultar os artigos.
+- [x] Imagens e descrições devem ser exibidas quando disponíveis.
+- [x] Falhas de conexão não devem provocar crashes previsíveis.
+- [x] Os estados da interface devem representar corretamente o resultado das operações.
 
 **Commit sugerido:**
 
@@ -105,27 +105,27 @@ A implementação deverá ocorrer progressivamente, com revisão, validação e 
 
 ### Tarefas
 
-- [ ] Implementar o caso de uso para salvar artigos.
-- [ ] Implementar associação de artigos às coleções.
-- [ ] Implementar seleção de uma ou mais coleções.
-- [ ] Permitir adicionar um artigo a várias coleções.
-- [ ] Impedir duplicação do mesmo artigo na mesma coleção.
-- [ ] Implementar remoção de artigos das coleções.
-- [ ] Persistir os artigos e suas associações no Room.
-- [ ] Reutilizar artigos já armazenados, evitando duplicação dos dados.
-- [ ] Integrar a pesquisa da Wikipédia com a biblioteca local.
-- [ ] Integrar a tela de leitura com as opções de salvamento.
-- [ ] Atualizar automaticamente as telas quando os dados locais forem alterados.
-- [ ] Implementar testes unitários das regras de associação e remoção.
+- [x] Implementar o caso de uso para salvar artigos.
+- [x] Implementar associação de artigos às coleções.
+- [x] Implementar seleção de uma ou mais coleções.
+- [x] Permitir adicionar um artigo a várias coleções.
+- [x] Impedir duplicação do mesmo artigo na mesma coleção.
+- [x] Implementar remoção de artigos das coleções.
+- [x] Persistir os artigos e suas associações no Room.
+- [x] Reutilizar artigos já armazenados, evitando duplicação dos dados.
+- [x] Integrar a pesquisa da Wikipédia com a biblioteca local.
+- [x] Integrar a tela de leitura com as opções de salvamento.
+- [x] Atualizar automaticamente as telas quando os dados locais forem alterados.
+- [x] Implementar testes unitários das regras de associação e remoção.
 
 ### Critérios de conclusão
 
-- O usuário deve conseguir salvar artigos encontrados na Wikipédia.
-- Um artigo deve poder pertencer a várias coleções.
-- Um artigo não deve aparecer duplicado dentro da mesma coleção.
-- Os artigos devem permanecer armazenados localmente.
-- As associações devem ser mantidas após reiniciar o aplicativo.
-- Os testes das regras de negócio devem apresentar resultados satisfatórios.
+- [x] O usuário deve conseguir salvar artigos encontrados na Wikipédia.
+- [x] Um artigo deve poder pertencer a várias coleções.
+- [x] Um artigo não deve aparecer duplicado dentro da mesma coleção.
+- [x] Os artigos devem permanecer armazenados localmente.
+- [x] As associações devem ser mantidas após reiniciar o aplicativo.
+- [x] Os testes das regras de negócio devem apresentar resultados satisfatórios.
 
 **Commit sugerido:**
 
@@ -208,8 +208,8 @@ A implementação deverá ocorrer progressivamente, com revisão, validação e 
 | Bundle | Descrição | Status |
 |---|---|---|
 | 1 | Biblioteca pessoal offline | **Concluído** |
-| 2 | Pesquisa e consulta à Wikipédia | Pendente |
-| 3 | Integração entre artigos e coleções | Pendente |
+| 2 | Pesquisa e consulta à Wikipédia | **Concluído** |
+| 3 | Integração entre artigos e coleções | **Concluído** |
 | 4 | Offline First e sincronização | Pendente |
 | 5 | Finalização e validação | Pendente |
 
@@ -218,4 +218,4 @@ A implementação deverá ocorrer progressivamente, com revisão, validação e 
 **Documento:** TASKS.md  
 **Projeto:** Erudito  
 **Etapa SDD:** Decomposição  
-**Status:** Bundle 1 Concluído
+**Status:** Bundle 3 Concluído

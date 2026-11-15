@@ -2,6 +2,7 @@ package com.example.erudito.data.mapper
 
 import com.example.erudito.data.remote.dto.WikipediaApiResponseDto
 import com.example.erudito.data.remote.dto.WikipediaPageDto
+import com.example.erudito.domain.model.Article
 import com.example.erudito.domain.model.WikipediaArticle
 import com.example.erudito.domain.model.WikipediaSearchResult
 import java.net.URLEncoder
@@ -58,6 +59,21 @@ fun WikipediaPageDto.toWikipediaArticleOrNull(): WikipediaArticle? {
         content = safeContent,
         imageUrl = safeImageUrl,
         url = safeUrl
+    )
+}
+
+fun WikipediaArticle.toDomainArticle(
+    lastUpdated: Long = System.currentTimeMillis()
+): Article {
+    return Article(
+        id = 0L,
+        title = title,
+        url = url,
+        description = description,
+        content = content,
+        imageUrl = imageUrl,
+        lastUpdated = lastUpdated,
+        wikipediaPageId = pageId
     )
 }
 

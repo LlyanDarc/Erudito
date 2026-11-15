@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.room.migration.Migration
 import androidx.room.withTransaction
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.example.erudito.data.local.dao.ArticleDao
@@ -23,7 +24,7 @@ import kotlinx.coroutines.launch
         ArticleEntity::class,
         CollectionArticleCrossRef::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 abstract class EruditoDatabase : RoomDatabase() {
@@ -49,6 +50,15 @@ abstract class EruditoDatabase : RoomDatabase() {
         @Volatile
         private var INSTANCE: EruditoDatabase? = null
 
+        val MIGRATION_1_2: Migration = object : Migration(1, 2) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE articles ADD COLUMN wikipediaPageId INTEGER")
+                db.execSQL(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS `index_articles_wikipediaPageId` ON `articles` (`wikipediaPageId`)"
+                )
+            }
+        }
+
         fun getInstance(context: Context): EruditoDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -56,6 +66,7 @@ abstract class EruditoDatabase : RoomDatabase() {
                     EruditoDatabase::class.java,
                     "erudito_database.db"
                 )
+                    .addMigrations(MIGRATION_1_2)
                     .addCallback(DatabaseCallback())
                     .build()
                 INSTANCE = instance

@@ -9,19 +9,20 @@ Este documento define o planejamento técnico e a estratégia de desenvolvimento
 | Tecnologia | Finalidade |
 |---|---|
 | Kotlin | Linguagem principal do aplicativo |
-| Jetpack Compose | Desenvolvimento das interfaces |
+| Jetpack Compose | Desenvolvimento das interfaces (Material 3) |
 | Navigation Compose | Navegação entre telas |
-| Retrofit | Consumo da API da Wikipédia (Bundle 2) |
-| Room | Persistência local |
+| Retrofit + Moshi + OkHttp | Consumo e desserialização da API MediaWiki da Wikipédia (Bundle 2) |
+| Coil | Carregamento assíncrono de imagens com fallback offline |
+| Room | Persistência local e migração de schema (`v1 → v2` com `MIGRATION_1_2`) |
 | Kotlin Coroutines | Execução de operações assíncronas |
-| Flow / StateFlow | Observação e comunicação de dados |
-| Hilt | Injeção de dependências |
+| Flow / StateFlow | Observação reativa e comunicação de estado entre camadas |
+| Hilt | Injeção de dependências (`EruditoHiltModule`) |
 | JUnit | Testes unitários |
-| Robolectric | Testes locais no JVM |
+| Robolectric | Testes locais de UI Compose, navegação e integração Room no JVM |
 
 ## 3. Arquitetura do Projeto
 
 O aplicativo utiliza Clean Architecture, organizada em três camadas principais:
-- **Presentation:** Interfaces em Compose, componentes reutilizáveis, gerenciamento de estado via ViewModels e StateFlow, e Navigation Compose.
-- **Domain:** Modelos de negócio puros (`Collection`, `Article`, `CollectionWithArticles`), contratos de repositórios e Use Cases com regras de negócio (RN01, RN05).
-- **Data:** Implementação de repositórios, Room Database (`EruditoDatabase`), DAOs (`CollectionDao`, `ArticleDao`), entidades e mappers.
+- **Presentation:** Interfaces em Compose (`HomeScreen`, `CollectionsScreen`, `CollectionDetailScreen`, `ArticleDetailScreen`, `SearchScreen`, `WikipediaArticleScreen`), componentes reutilizáveis (`CollectionPickerDialog`, `ArticleCard`, `CollectionCard`, `SearchResultCard`, diálogos), ViewModels com `StateFlow` / `Channel` e Navigation Compose (`EruditoNavHost`).
+- **Domain:** Modelos de negócio puros (`Collection`, `Article`, `CollectionWithArticles`, `WikipediaSearchResult`, `WikipediaArticle`, `WikipediaException`), contratos de repositórios (`CollectionRepository`, `ArticleRepository`, `WikipediaRepository`) e Use Cases das regras RN01–RN07 (`CreateCollectionUseCase`, `RenameCollectionUseCase`, `DeleteCollectionUseCase`, `GetCollectionsUseCase`, `GetCollectionWithArticlesUseCase`, `GetSavedArticlesUseCase`, `GetArticleByIdUseCase`, `SearchWikipediaArticlesUseCase`, `GetWikipediaArticleUseCase`, `SaveWikipediaArticleToCollectionsUseCase`, `AddArticleToCollectionsUseCase`, `RemoveArticleFromCollectionUseCase`, `GetCollectionIdsForArticleUseCase`).
+- **Data:** Implementação dos repositórios (`CollectionRepositoryImpl`, `ArticleRepositoryImpl`, `WikipediaRepositoryImpl`), Room Database v2 (`EruditoDatabase`, `MIGRATION_1_2`), DAOs (`CollectionDao`, `ArticleDao`), API MediaWiki (`WikipediaApiService`, DTOs), entidades e mappers (`CollectionMapper`, `ArticleMapper`, `WikipediaMapper`).

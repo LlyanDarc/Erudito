@@ -12,14 +12,18 @@ import com.example.erudito.data.repository.WikipediaRepositoryImpl
 import com.example.erudito.domain.repository.ArticleRepository
 import com.example.erudito.domain.repository.CollectionRepository
 import com.example.erudito.domain.repository.WikipediaRepository
+import com.example.erudito.domain.usecase.AddArticleToCollectionsUseCase
 import com.example.erudito.domain.usecase.CreateCollectionUseCase
 import com.example.erudito.domain.usecase.DeleteCollectionUseCase
 import com.example.erudito.domain.usecase.GetArticleByIdUseCase
+import com.example.erudito.domain.usecase.GetCollectionIdsForArticleUseCase
 import com.example.erudito.domain.usecase.GetCollectionWithArticlesUseCase
 import com.example.erudito.domain.usecase.GetCollectionsUseCase
 import com.example.erudito.domain.usecase.GetSavedArticlesUseCase
 import com.example.erudito.domain.usecase.GetWikipediaArticleUseCase
+import com.example.erudito.domain.usecase.RemoveArticleFromCollectionUseCase
 import com.example.erudito.domain.usecase.RenameCollectionUseCase
+import com.example.erudito.domain.usecase.SaveWikipediaArticleToCollectionsUseCase
 import com.example.erudito.domain.usecase.SearchWikipediaArticlesUseCase
 import com.squareup.moshi.Moshi
 import dagger.Module
@@ -177,5 +181,41 @@ object EruditoHiltModule {
     @Provides
     fun provideGetWikipediaArticleUseCase(repository: WikipediaRepository): GetWikipediaArticleUseCase {
         return GetWikipediaArticleUseCase(repository)
+    }
+
+    @Provides
+    fun provideSaveWikipediaArticleToCollectionsUseCase(
+        articleRepository: ArticleRepository,
+        collectionRepository: CollectionRepository
+    ): SaveWikipediaArticleToCollectionsUseCase {
+        return SaveWikipediaArticleToCollectionsUseCase(
+            articleRepository = articleRepository,
+            collectionRepository = collectionRepository
+        )
+    }
+
+    @Provides
+    fun provideAddArticleToCollectionsUseCase(
+        articleRepository: ArticleRepository,
+        collectionRepository: CollectionRepository
+    ): AddArticleToCollectionsUseCase {
+        return AddArticleToCollectionsUseCase(
+            articleRepository = articleRepository,
+            collectionRepository = collectionRepository
+        )
+    }
+
+    @Provides
+    fun provideRemoveArticleFromCollectionUseCase(
+        articleRepository: ArticleRepository
+    ): RemoveArticleFromCollectionUseCase {
+        return RemoveArticleFromCollectionUseCase(articleRepository)
+    }
+
+    @Provides
+    fun provideGetCollectionIdsForArticleUseCase(
+        articleRepository: ArticleRepository
+    ): GetCollectionIdsForArticleUseCase {
+        return GetCollectionIdsForArticleUseCase(articleRepository)
     }
 }

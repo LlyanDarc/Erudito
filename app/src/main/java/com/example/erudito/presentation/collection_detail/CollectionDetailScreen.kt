@@ -17,11 +17,14 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.MenuBook
+import androidx.compose.material.icons.filled.BookmarkRemove
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.FolderSpecial
-import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -35,6 +38,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -194,7 +198,7 @@ fun CollectionDetailScreen(
             }
         } else if (collection == null) {
             EmptyStateView(
-                icon = Icons.Default.MenuBook,
+                icon = Icons.AutoMirrored.Filled.MenuBook,
                 title = "Coleção não encontrada",
                 description = "Esta coleção pode ter sido removida.",
                 actionButtonText = "Voltar",
@@ -207,7 +211,8 @@ fun CollectionDetailScreen(
             LazyColumn(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(innerPadding),
+                    .padding(innerPadding)
+                    .testTag("collection_detail_list"),
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
@@ -308,7 +313,7 @@ fun CollectionDetailScreen(
                 if (articles.isEmpty()) {
                     item {
                         EmptyStateView(
-                            icon = Icons.Default.MenuBook,
+                            icon = Icons.AutoMirrored.Filled.MenuBook,
                             title = "Nenhum artigo nesta coleção",
                             description = "Esta coleção ainda não possui artigos associados. Os artigos vinculados estarão disponíveis offline aqui."
                         )
@@ -320,7 +325,10 @@ fun CollectionDetailScreen(
                     ) { article ->
                         ArticleCard(
                             article = article,
-                            onClick = { onNavigateToArticleDetail(article.id) }
+                            onClick = { onNavigateToArticleDetail(article.id) },
+                            onRemoveFromCollectionClick = {
+                                viewModel.openRemoveArticleDialog(article)
+                            }
                         )
                     }
                 }
@@ -348,4 +356,66 @@ fun CollectionDetailScreen(
             }
         )
     }
+
+    val articleToRemove = uiState.articleToRemove
+    if (articleToRemove != null && collection != null) {
+        RemoveArticleFromCollectionDialog(
+            articleTitle = articleToRemove.title,
+            collectionName = collection.name,
+            onDismiss = { viewModel.closeRemoveArticleDialog() },
+            onConfirm = { viewModel.confirmRemoveArticle() }
+        )
+    }
+}
+
+@Composable
+private fun RemoveArticleFromCollectionDialog(
+    articleTitle: String,
+    collectionName: String,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        modifier = Modifier.testTag("remove_article_confirmation_dialog"),
+        icon = {
+            Icon(
+                imageVector = Icons.Default.BookmarkRemove,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.error
+            )
+        },
+        title = {
+            Text(
+                text = "Remover da coleção",
+                style = MaterialTheme.typography.titleLarge
+            )
+        },
+        text = {
+            Text(
+                text = "Deseja remover \"$articleTitle\" da coleção \"$collectionName\"?\n\nO artigo continuará salvo em sua biblioteca e em outras coleções associadas.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        },
+        confirmButton = {
+            TextButton(
+                onClick = onConfirm,
+                colors = ButtonDefaults.textButtonColors(
+                    contentColor = MaterialTheme.colorScheme.error
+                ),
+                modifier = Modifier.testTag("confirm_remove_article_button")
+            ) {
+                Text("Remover")
+            }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = onDismiss,
+                modifier = Modifier.testTag("cancel_remove_article_button")
+            ) {
+                Text("Cancelar")
+            }
+        }
+    )
 }

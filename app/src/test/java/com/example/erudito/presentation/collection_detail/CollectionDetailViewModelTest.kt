@@ -4,14 +4,19 @@ import androidx.lifecycle.SavedStateHandle
 import com.example.erudito.domain.model.Article
 import com.example.erudito.domain.model.Collection
 import com.example.erudito.domain.model.CollectionWithArticles
+import com.example.erudito.domain.repository.ArticleRepository
 import com.example.erudito.domain.repository.CollectionRepository
+import com.example.erudito.domain.repository.FakeArticleRepository
 import com.example.erudito.domain.usecase.DeleteCollectionUseCase
 import com.example.erudito.domain.usecase.GetCollectionWithArticlesUseCase
+import com.example.erudito.domain.usecase.RemoveArticleFromCollectionUseCase
 import com.example.erudito.domain.usecase.RenameCollectionUseCase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
@@ -20,6 +25,7 @@ import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -47,12 +53,14 @@ class CollectionDetailViewModelTest {
             articles = listOf(Article(id = 1L, title = "Sócrates", url = "https://pt.wikipedia.org/wiki/Socrates"))
         )
         val repository = RaceConditionTestCollectionRepository(initial = sampleCollection)
+        val articleRepository = FakeArticleRepository()
 
         val viewModel = CollectionDetailViewModel(
             savedStateHandle = SavedStateHandle(mapOf("collectionId" to 1L)),
             getCollectionWithArticlesUseCase = GetCollectionWithArticlesUseCase(repository),
             renameCollectionUseCase = RenameCollectionUseCase(repository),
-            deleteCollectionUseCase = DeleteCollectionUseCase(repository)
+            deleteCollectionUseCase = DeleteCollectionUseCase(repository),
+            removeArticleFromCollectionUseCase = RemoveArticleFromCollectionUseCase(articleRepository)
         )
 
         val observedErrors = mutableListOf<String?>()
@@ -83,12 +91,14 @@ class CollectionDetailViewModelTest {
             articles = emptyList()
         )
         val repository = RaceConditionTestCollectionRepository(initial = sampleCollection)
+        val articleRepository = FakeArticleRepository()
 
         val viewModel = CollectionDetailViewModel(
             savedStateHandle = SavedStateHandle(mapOf("collectionId" to 1L)),
             getCollectionWithArticlesUseCase = GetCollectionWithArticlesUseCase(repository),
             renameCollectionUseCase = RenameCollectionUseCase(repository),
-            deleteCollectionUseCase = DeleteCollectionUseCase(repository)
+            deleteCollectionUseCase = DeleteCollectionUseCase(repository),
+            removeArticleFromCollectionUseCase = RemoveArticleFromCollectionUseCase(articleRepository)
         )
 
         val feedback = mutableListOf<String>()
@@ -113,12 +123,14 @@ class CollectionDetailViewModelTest {
             initial = sampleCollection,
             deleteError = IllegalStateException("Falha de I/O ao excluir")
         )
+        val articleRepository = FakeArticleRepository()
 
         val viewModel = CollectionDetailViewModel(
             savedStateHandle = SavedStateHandle(mapOf("collectionId" to 1L)),
             getCollectionWithArticlesUseCase = GetCollectionWithArticlesUseCase(repository),
             renameCollectionUseCase = RenameCollectionUseCase(repository),
-            deleteCollectionUseCase = DeleteCollectionUseCase(repository)
+            deleteCollectionUseCase = DeleteCollectionUseCase(repository),
+            removeArticleFromCollectionUseCase = RemoveArticleFromCollectionUseCase(articleRepository)
         )
 
         viewModel.deleteCollection()
@@ -127,6 +139,128 @@ class CollectionDetailViewModelTest {
         assertFalse(state.isDeleted)
         assertFalse(state.isDeleting)
         assertEquals("Falha de I/O ao excluir", state.errorMessage)
+    }
+
+    @Test
+    fun `confirmRemoveArticle removes only link with current collection preserves article and other associations and updates reactively`() = runTest {
+        val articleRepository = FakeArticleRepository()
+        val collectionRepository = ReactiveCollectionRepository(articleRepository)
+
+        val col1Id = collectionRepository.createCollection("Filosofia")
+        val col2Id = collectionRepository.createCollection("Grécia Antiga")
+
+        val socratesId = articleRepository.saveArticleAndAssociateCollections(
+            Article(
+                title = "Sócrates",
+                url = "https://pt.wikipedia.org/wiki/S%C3%B3crates",
+                wikipediaPageId = 42L
+            ),
+            listOf(col1Id, col2Id)
+        )
+        val plataoId = articleRepository.saveArticleAndAssociateCollections(
+            Article(
+                title = "Platão",
+                url = "https://pt.wikipedia.org/wiki/Plat%C3%A3o",
+                wikipediaPageId = 43L
+            ),
+            listOf(col1Id)
+        )
+
+        val viewModel = CollectionDetailViewModel(
+            savedStateHandle = SavedStateHandle(mapOf("collectionId" to col1Id)),
+            getCollectionWithArticlesUseCase = GetCollectionWithArticlesUseCase(collectionRepository),
+            renameCollectionUseCase = RenameCollectionUseCase(collectionRepository),
+            deleteCollectionUseCase = DeleteCollectionUseCase(collectionRepository),
+            removeArticleFromCollectionUseCase = RemoveArticleFromCollectionUseCase(articleRepository)
+        )
+
+        val feedback = mutableListOf<String>()
+        val feedbackJob = launch(testDispatcher) {
+            viewModel.feedbackEvents.collect { feedback.add(it) }
+        }
+
+        assertEquals(2, viewModel.uiState.value.collectionWithArticles?.articles?.size)
+
+        val socrates = viewModel.uiState.value.collectionWithArticles!!.articles.first { it.id == socratesId }
+        viewModel.openRemoveArticleDialog(socrates)
+        assertEquals(socrates, viewModel.uiState.value.articleToRemove)
+
+        viewModel.confirmRemoveArticle()
+
+        // Dialog fecha e lista atualiza reativamente contendo apenas Platão
+        assertNull(viewModel.uiState.value.articleToRemove)
+        assertFalse(viewModel.uiState.value.isRemovingArticle)
+        assertNull(viewModel.uiState.value.errorMessage)
+        val remainingInCol1 = viewModel.uiState.value.collectionWithArticles?.articles.orEmpty()
+        assertEquals(listOf(plataoId), remainingInCol1.map { it.id })
+
+        // Artigo continua salvo no banco e associado à outra coleção
+        assertNotNull(articleRepository.getArticleById(socratesId))
+        assertEquals(listOf(col2Id), articleRepository.getCollectionIdsForArticle(socratesId).first())
+        assertEquals(listOf("Artigo \"Sócrates\" removido da coleção."), feedback)
+
+        feedbackJob.cancel()
+    }
+
+    @Test
+    fun `closeRemoveArticleDialog cancels removal without altering associations`() = runTest {
+        val articleRepository = FakeArticleRepository()
+        val collectionRepository = ReactiveCollectionRepository(articleRepository)
+        val col1Id = collectionRepository.createCollection("História")
+        val articleId = articleRepository.saveArticleAndAssociateCollections(
+            Article(title = "Roma Antiga", url = "https://pt.wikipedia.org/wiki/Roma_Antiga"),
+            listOf(col1Id)
+        )
+
+        val viewModel = CollectionDetailViewModel(
+            savedStateHandle = SavedStateHandle(mapOf("collectionId" to col1Id)),
+            getCollectionWithArticlesUseCase = GetCollectionWithArticlesUseCase(collectionRepository),
+            renameCollectionUseCase = RenameCollectionUseCase(collectionRepository),
+            deleteCollectionUseCase = DeleteCollectionUseCase(collectionRepository),
+            removeArticleFromCollectionUseCase = RemoveArticleFromCollectionUseCase(articleRepository)
+        )
+
+        val article = viewModel.uiState.value.collectionWithArticles!!.articles.first()
+        viewModel.openRemoveArticleDialog(article)
+        assertEquals(article, viewModel.uiState.value.articleToRemove)
+
+        viewModel.closeRemoveArticleDialog()
+        assertNull(viewModel.uiState.value.articleToRemove)
+        assertEquals(listOf(col1Id), articleRepository.getCollectionIdsForArticle(articleId).first())
+        assertEquals(1, viewModel.uiState.value.collectionWithArticles?.articles?.size)
+    }
+
+    @Test
+    fun `confirmRemoveArticle exposes errorMessage when removal fails`() = runTest {
+        val sampleArticle = Article(id = 10L, title = "Galileu", url = "https://pt.wikipedia.org/wiki/Galileu")
+        val collectionRepo = RaceConditionTestCollectionRepository(
+            initial = CollectionWithArticles(
+                collection = Collection(id = 1L, name = "Astronomia", articleCount = 1),
+                articles = listOf(sampleArticle)
+            )
+        )
+        val failingArticleRepo = object : ArticleRepository by FakeArticleRepository() {
+            override suspend fun removeArticleFromCollection(articleId: Long, collectionId: Long) {
+                throw IllegalStateException("Falha ao remover vínculo no banco")
+            }
+        }
+
+        val viewModel = CollectionDetailViewModel(
+            savedStateHandle = SavedStateHandle(mapOf("collectionId" to 1L)),
+            getCollectionWithArticlesUseCase = GetCollectionWithArticlesUseCase(collectionRepo),
+            renameCollectionUseCase = RenameCollectionUseCase(collectionRepo),
+            deleteCollectionUseCase = DeleteCollectionUseCase(collectionRepo),
+            removeArticleFromCollectionUseCase = RemoveArticleFromCollectionUseCase(failingArticleRepo)
+        )
+
+        viewModel.openRemoveArticleDialog(sampleArticle)
+        viewModel.confirmRemoveArticle()
+
+        val state = viewModel.uiState.value
+        assertFalse(state.isRemovingArticle)
+        assertNull(state.articleToRemove)
+        assertEquals("Falha ao remover vínculo no banco", state.errorMessage)
+        assertEquals(1, state.collectionWithArticles?.articles?.size)
     }
 
     private class RaceConditionTestCollectionRepository(
@@ -150,6 +284,52 @@ class CollectionDetailViewModelTest {
             deleteError?.let { throw it }
             // Simula o InvalidationTracker do Room emitindo null ANTES de deleteCollection retornar
             flow.value = null
+        }
+    }
+
+    private class ReactiveCollectionRepository(
+        private val articleRepository: FakeArticleRepository
+    ) : CollectionRepository {
+        private val collections = mutableListOf<Collection>()
+        private val collectionsFlow = MutableStateFlow<List<Collection>>(emptyList())
+
+        override fun getCollections(): Flow<List<Collection>> = collectionsFlow
+
+        override fun getCollectionWithArticles(collectionId: Long): Flow<CollectionWithArticles?> {
+            return combine(
+                collectionsFlow,
+                articleRepository.getArticlesForCollection(collectionId)
+            ) { allCollections, articles ->
+                val col = allCollections.find { it.id == collectionId } ?: return@combine null
+                CollectionWithArticles(
+                    collection = col.copy(articleCount = articles.size),
+                    articles = articles
+                )
+            }
+        }
+
+        override suspend fun getCollectionById(collectionId: Long): Collection? {
+            return collections.find { it.id == collectionId }
+        }
+
+        override suspend fun createCollection(name: String): Long {
+            val newId = (collections.maxOfOrNull { it.id } ?: 0L) + 1L
+            collections.add(Collection(id = newId, name = name, articleCount = 0))
+            collectionsFlow.value = collections.toList()
+            return newId
+        }
+
+        override suspend fun renameCollection(id: Long, newName: String) {
+            val idx = collections.indexOfFirst { it.id == id }
+            if (idx >= 0) {
+                collections[idx] = collections[idx].copy(name = newName)
+                collectionsFlow.value = collections.toList()
+            }
+        }
+
+        override suspend fun deleteCollection(id: Long) {
+            collections.removeAll { it.id == id }
+            collectionsFlow.value = collections.toList()
         }
     }
 }

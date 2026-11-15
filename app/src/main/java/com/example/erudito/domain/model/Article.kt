@@ -7,5 +7,6 @@ data class Article(
     val description: String? = null,
     val content: String? = null,
     val imageUrl: String? = null,
-    val lastUpdated: Long = System.currentTimeMillis()
+    val lastUpdated: Long = System.currentTimeMillis(),
+    val wikipediaPageId: Long? = null
 )

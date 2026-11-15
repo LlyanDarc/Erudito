@@ -1,140 +1,78 @@
 # Erudito — Registro de Resultados de Testes
 
-**Data da Última Revisão:** 11 de Novembro de 2026  
-**Ambiente:** Android SDK 36 (VanillaIceCream), Gradle 9.3.1, Kotlin 2.2.10, Robolectric 4.16.1, JUnit 4.13.2, Dagger Hilt 2.55 (KSP)  
-**Bundle Validado:** Bundle 1 — Biblioteca pessoal offline (Revisão Técnica Concluída)  
+**Data da Última Revisão:** 15 de Novembro de 2026  
+**Ambiente:** Android SDK 36, Gradle 9.3.1, Kotlin 2.2.10, Robolectric 4.16.1, JUnit 4.13.2, Dagger Hilt 2.55 (KSP), Room 2.7.0  
+**Comando Executado:** `gradle :app:compileDebugKotlin :app:testDebugUnitTest --rerun-tasks`  
+**Escopo Validado:** Bundles 1, 2 e 3 (Etapas 1–5 concluídas)
 
 ---
 
 ## 1. Resumo da Execução
 
-| Camada | Test Suite | Testes Executados | Sucesso | Falhas | Tempo de Execução |
-|---|---|---|---|---|---|
-| Domain | `CreateCollectionUseCaseTest` | 4 | 4 | 0 | 0.10s |
-| Domain | `RenameCollectionUseCaseTest` | 4 | 4 | 0 | 0.01s |
-| Domain | `DeleteCollectionUseCaseTest` | 1 | 1 | 0 | 0.01s |
-| Domain | `GetCollectionsUseCaseTest` | 2 | 2 | 0 | < 0.01s |
-| Domain | `GetCollectionWithArticlesUseCaseTest` | 2 | 2 | 0 | 0.01s |
-| Domain | `GetSavedArticlesUseCaseTest` | 2 | 2 | 0 | < 0.01s |
-| Domain | `GetArticleByIdUseCaseTest` | 2 | 2 | 0 | 0.01s |
-| Data (Room Integration) | `RoomDatabaseIntegrationTest` | 6 | 6 | 0 | 9.10s |
-| Presentation (UI & Compose) | `HomeScreenDuplicateKeyTest` | 1 | 1 | 0 | 2.74s |
-| Presentation / Resources | `ExampleRobolectricTest` | 1 | 1 | 0 | 5.61s |
-| Unit | `ExampleUnitTest` | 1 | 1 | 0 | < 0.01s |
-| **Total** | **11 Suites** | **26** | **26** | **0** | **56s (build completo)** |
+| Camada | Test Suite | Executados | Aprovados | Reprovados | Ignorados | Tempo |
+|---|---|---|---|---|---|---|
+| Domain | `ArticleCollectionIntegrationUseCasesTest` | 10 | 10 | 0 | 0 | 0.07s |
+| Domain | `CreateCollectionUseCaseTest` | 4 | 4 | 0 | 0 | 0.01s |
+| Domain | `RenameCollectionUseCaseTest` | 4 | 4 | 0 | 0 | 0.01s |
+| Domain | `DeleteCollectionUseCaseTest` | 1 | 1 | 0 | 0 | < 0.01s |
+| Domain | `GetCollectionsUseCaseTest` | 2 | 2 | 0 | 0 | < 0.01s |
+| Domain | `GetCollectionWithArticlesUseCaseTest` | 2 | 2 | 0 | 0 | 0.01s |
+| Domain | `GetSavedArticlesUseCaseTest` | 2 | 2 | 0 | 0 | < 0.01s |
+| Domain | `GetArticleByIdUseCaseTest` | 2 | 2 | 0 | 0 | < 0.01s |
+| Domain | `WikipediaUseCasesTest` | 7 | 7 | 0 | 0 | 0.03s |
+| Data (Room Integration) | `RoomDatabaseIntegrationTest` | 16 | 16 | 0 | 0 | 8.88s |
+| Data (Mappers) | `ArticleAndWikipediaMapperTest` | 4 | 4 | 0 | 0 | < 0.01s |
+| Data (Remote DTOs) | `WikipediaDtoDeserializationTest` | 7 | 7 | 0 | 0 | 0.27s |
+| Data (Repositories) | `ArticleRepositoryImplTest` | 5 | 5 | 0 | 0 | 0.39s |
+| Data (Repositories) | `WikipediaRepositoryImplTest` | 9 | 9 | 0 | 0 | 0.12s |
+| Presentation (ViewModel) | `SearchViewModelTest` | 9 | 9 | 0 | 0 | 0.04s |
+| Presentation (ViewModel) | `WikipediaArticleViewModelTest` | 14 | 14 | 0 | 0 | 0.09s |
+| Presentation (ViewModel) | `CollectionDetailViewModelTest` | 6 | 6 | 0 | 0 | 0.03s |
+| Presentation (ViewModel) | `ArticleDetailViewModelTest` | 7 | 7 | 0 | 0 | 0.06s |
+| Presentation (UI & Compose) | `SearchScreenTest` | 6 | 6 | 0 | 0 | 1.44s |
+| Presentation (UI & Compose) | `WikipediaArticleScreenTest` | 8 | 8 | 0 | 0 | 1.51s |
+| Presentation (UI & Compose) | `CollectionPickerDialogTest` | 5 | 5 | 0 | 0 | 1.74s |
+| Presentation (UI & Compose) | `CollectionDetailScreenTest` | 3 | 3 | 0 | 0 | 0.91s |
+| Presentation (UI & Compose) | `ArticleDetailScreenTest` | 6 | 6 | 0 | 0 | 5.88s |
+| Presentation (UI & Compose) | `CollectionFeedbackMessagesTest` | 5 | 5 | 0 | 0 | 1.32s |
+| Presentation (UI & Compose) | `HomeErrorHandlingTest` | 2 | 2 | 0 | 0 | 0.55s |
+| Presentation (UI & Compose) | `HomeScreenDuplicateKeyTest` | 1 | 1 | 0 | 0 | 0.31s |
+| Presentation (Navigation) | `EruditoNavigationTest` | 4 | 4 | 0 | 0 | 1.31s |
+| Presentation (E2E Room + Nav) | `Bundle3EndToEndIntegrationTest` | 3 | 3 | 0 | 0 | 4.59s |
+| Presentation / Resources | `ExampleRobolectricTest` | 1 | 1 | 0 | 0 | 9.23s |
+| Unit | `ExampleUnitTest` | 1 | 1 | 0 | 0 | < 0.01s |
+| **Total** | **30 Suítes** | **156** | **156** | **0** | **0** | **2m 2s (build + rerun-tasks)** |
 
-**Resultado Geral:** **SUCESSO (100% de aprovação — 26 testes)**
-
----
-
-## 2. Detalhamento dos Testes Executados
-
-### 2.1. Testes de Regras de Negócio e Casos de Uso (Domain)
-
-#### `CreateCollectionUseCaseTest` (Regra RN01)
-- `invoke with valid name creates collection successfully`:
-  - **Cenário:** Usuário cria uma coleção com nome válido ("Ciência e Astronomia").
-  - **Resultado:** Coleção persistida com ID válido e contagem inicial 0. (**APROVADO**)
-- `invoke trims whitespace from collection name`:
-  - **Cenário:** Usuário insere espaços excedentes ("   História do Brasil   ").
-  - **Resultado:** Espaços higienizados antes da persistência ("História do Brasil"). (**APROVADO**)
-- `invoke with empty name throws IllegalArgumentException per RN01`:
-  - **Cenário:** Criação com string vazia `""`.
-  - **Resultado:** Lança `IllegalArgumentException` ("O nome da coleção não pode ser vazio ou composto apenas por espaços."). (**APROVADO**)
-- `invoke with whitespace only throws IllegalArgumentException per RN01`:
-  - **Cenário:** Criação composta exclusivamente por espaços `"     "`.
-  - **Resultado:** Lança `IllegalArgumentException` conforme RN01. (**APROVADO**)
-
-#### `RenameCollectionUseCaseTest` (Regra RN01)
-- `invoke with valid name renames collection successfully`:
-  - **Cenário:** Renomear coleção existente para "Novo Nome Atualizado".
-  - **Resultado:** Nome alterado com sucesso no repositório. (**APROVADO**)
-- `invoke trims whitespace when renaming`:
-  - **Cenário:** Renomear fornecendo espaços no início e no fim.
-  - **Resultado:** Espaços higienizados no repositório. (**APROVADO**)
-- `invoke with empty name throws IllegalArgumentException per RN01`:
-  - **Cenário:** Tentativa de renomear para `""`.
-  - **Resultado:** Lança `IllegalArgumentException` conforme RN01. (**APROVADO**)
-- `invoke with whitespace only throws IllegalArgumentException per RN01`:
-  - **Cenário:** Tentativa de renomear para `"     "`.
-  - **Resultado:** Lança `IllegalArgumentException` conforme RN01. (**APROVADO**)
-
-#### `DeleteCollectionUseCaseTest` (Regra RN05)
-- `invoke removes collection from repository`:
-  - **Cenário:** Excluir coleção por ID existente.
-  - **Resultado:** Coleção e suas associações removidas do repositório. (**APROVADO**)
-
-#### `GetCollectionsUseCaseTest`
-- `invoke with empty repository emits empty list`:
-  - **Cenário:** Nenhuma coleção cadastrada.
-  - **Resultado:** Emite lista vazia reativamente. (**APROVADO**)
-- `invoke emits all stored collections`:
-  - **Cenário:** Coleções cadastradas no repositório.
-  - **Resultado:** Emite a lista com todas as coleções. (**APROVADO**)
-
-#### `GetCollectionWithArticlesUseCaseTest`
-- `invoke returns collection with its associated articles`:
-  - **Cenário:** Recuperar detalhes de uma coleção e seus artigos associados.
-  - **Resultado:** Retorna modelo agregado `CollectionWithArticles` com a lista de artigos. (**APROVADO**)
-- `invoke with non-existing collection returns null`:
-  - **Cenário:** Consulta com ID inexistente.
-  - **Resultado:** Retorna `null`. (**APROVADO**)
-
-#### `GetSavedArticlesUseCaseTest`
-- `invoke with empty repository emits empty list`:
-  - **Cenário:** Nenhum artigo salvo.
-  - **Resultado:** Emite lista vazia. (**APROVADO**)
-- `invoke emits all saved articles`:
-  - **Cenário:** Artigos salvos na biblioteca.
-  - **Resultado:** Emite todos os artigos salvos no Flow. (**APROVADO**)
-
-#### `GetArticleByIdUseCaseTest`
-- `invoke with existing id returns article`:
-  - **Cenário:** Recuperar artigo salvo por ID válido.
-  - **Resultado:** Retorna os detalhes completos do artigo para leitura offline. (**APROVADO**)
-- `invoke with non-existing id returns null`:
-  - **Cenário:** Consulta de artigo com ID inexistente.
-  - **Resultado:** Retorna `null`. (**APROVADO**)
+**Resultado Geral:** **SUCESSO (156 aprovados, 0 reprovados, 0 ignorados)**
 
 ---
 
-### 2.2. Testes de Integração com o Banco de Dados Room (`RoomDatabaseIntegrationTest`)
+## 2. Cobertura por Bundle e Camada
 
-Executados no JVM via Robolectric com banco de dados SQLite em memória (`Room.inMemoryDatabaseBuilder`):
+### 2.1. Bundle 1 — Biblioteca Pessoal Offline
+- Regras de negócio RN01–RN07 na camada Domain (`CreateCollectionUseCaseTest`, `RenameCollectionUseCaseTest`, `DeleteCollectionUseCaseTest`, `GetCollectionsUseCaseTest`, `GetCollectionWithArticlesUseCaseTest`, `GetSavedArticlesUseCaseTest`, `GetArticleByIdUseCaseTest`).
+- Persistência SQLite, integridade referencial, remoção em cascata (RN05) e pré-população atômica (`RoomDatabaseIntegrationTest`).
+- Feedbacks visuais, tratamento de erros e chaves únicas em listas (`CollectionFeedbackMessagesTest`, `HomeErrorHandlingTest`, `HomeScreenDuplicateKeyTest`).
 
-1. **`insertAndRetrieveCollection`**:
-   - Criação de `CollectionEntity` e consulta via DAO.
-   - **Resultado:** Dados gravados e lidos corretamente do SQLite. (**APROVADO**)
-2. **`renameCollectionInDatabase`**:
-   - Atualização do nome da coleção no SQLite.
-   - **Resultado:** Registro atualizado com sucesso. (**APROVADO**)
-3. **`articleCanBelongToMultipleCollectionsPerRN03` (RN03)**:
-   - Um mesmo artigo associado a duas coleções diferentes ("História" e "Artes").
-   - **Resultado:** Artigo recuperado com sucesso nas consultas de ambas as coleções. (**APROVADO**)
-4. **`preventDuplicateArticleInSameCollectionPerRN04` (RN04)**:
-   - Inserção duplicada da associação (mesmo `collectionId` e `articleId`).
-   - **Resultado:** Chave primária composta com `OnConflictStrategy.IGNORE` impede duplicação da linha. (**APROVADO**)
-5. **`deletingCollectionCascadesCrossRefWithoutDeletingArticlePerRN05` (RN05)**:
-   - Exclusão de uma coleção que possui artigo compartilhado com outra coleção.
-   - **Resultado:** Associação removida via CASCADE sem apagar o artigo, que continua preservado na outra coleção. (**APROVADO**)
-6. **`getAllCollectionsWithCountComputesCorrectAggregate`**:
-   - Validação da query SQL com `LEFT JOIN` e `COUNT(cr.articleId)`.
-   - **Resultado:** Projeção retorna o número exato de artigos associados a cada coleção. (**APROVADO**)
+### 2.2. Bundle 2 — Pesquisa e Consulta à Wikipédia
+- Desserialização de DTOs da API MediaWiki e mapeamento para modelos de domínio (`WikipediaDtoDeserializationTest`, `ArticleAndWikipediaMapperTest`, `WikipediaRepositoryImplTest`, `WikipediaUseCasesTest`).
+- Fluxo de pesquisa e leitura online (`SearchViewModelTest`, `SearchScreenTest`, `WikipediaArticleViewModelTest`, `WikipediaArticleScreenTest`, `EruditoNavigationTest`).
+
+### 2.3. Bundle 3 — Integração entre Artigos e Coleções (Relação N:N)
+- **Banco Room & Migração v1 → v2 (`RoomDatabaseIntegrationTest`):** migração `MIGRATION_1_2` preservando dados legados, índice único para `wikipediaPageId` não nulo, reutilização de artigos por `wikipediaPageId` e por fallback de URL legado, rollback atômico em caso de coleção inexistente e remoção individual de `CollectionArticleCrossRef` preservando artigo e demais coleções.
+- **Repositório & Casos de Uso (`ArticleRepositoryImplTest`, `ArticleCollectionIntegrationUseCasesTest`):** persistência transacional, associação múltipla sem duplicidade, remoção isolada e observação reativa de coleções por artigo (`ID`, `wikipediaPageId` e fallback URL).
+- **Componentes & Telas (`CollectionPickerDialogTest`, `WikipediaArticleViewModelTest`, `WikipediaArticleScreenTest`, `CollectionDetailViewModelTest`, `CollectionDetailScreenTest`, `ArticleDetailViewModelTest`, `ArticleDetailScreenTest`):** seleção múltipla, badge `"Já salvo"`, criação inline de coleções, confirmação de remoção individual de artigo na coleção, gerenciamento de coleções, exibição de imagem com fallback offline e abertura da URL persistida da Wikipédia (botão `"Abrir na Wikipédia"` e endereço clicável via `LocalUriHandler`) na leitura offline.
+- **Integração Ponta a Ponta (`Bundle3EndToEndIntegrationTest` + `EruditoNavigationTest`):** validação completa com `EruditoDatabase` real em memória, repositórios reais, UseCases reais, ViewModels reais e `EruditoNavHost` cobrindo:
+  1. `Home → Search → WikipediaArticle → Salvar (com criação inline) → Voltar para Search/Home → Collections → CollectionDetail → ArticleDetail → Modificar associações → Voltar para CollectionDetail → Remover vínculo individual`;
+  2. Reutilização de registro legado/local ao reabrir artigo na Wikipédia sem duplicar artigo ou vínculos;
+  3. Desvinculação total de coleções em `ArticleDetailScreen` preservando o artigo na biblioteca (`HomeScreen`) e permitindo re-associação posterior.
 
 ---
 
-## 3. Conformidade com os Critérios do Bundle 1
+## 3. Pendências para Validação em Ambiente Android Studio / Dispositivo Real
 
-| Critério de Conclusão | Evidência de Validação | Status |
-|---|---|---|
-| Iniciar e apresentar a biblioteca | `MainActivity` carrega `HomeScreen` com hero banner e estatísticas | **Aprovado** |
-| Criar coleções | Diálogo com validação RN01 e persistência Room | **Aprovado** |
-| Listar coleções | Lista reativa com contagem dinâmica em `HomeScreen` e `CollectionsScreen` | **Aprovado** |
-| Renomear coleções | Validação RN01 e atualização no Room | **Aprovado** |
-| Excluir coleções | Diálogo de confirmação e exclusão em cascata (RN05) | **Aprovado** |
-| Visualizar artigos por coleção | `CollectionDetailScreen` exibe os artigos associados | **Aprovado** |
-| Visualizar artigos offline | `ArticleDetailScreen` permite leitura offline completa de artigos | **Aprovado** |
-| Persistência local com Room | Validada com 6 testes de integração em SQLite | **Aprovado** |
-| Funcionamento 100% offline | Sem dependência de rede nas telas da biblioteca | **Aprovado** |
-| Clean Architecture & DI | Camadas desacopladas com Hilt 2.55 (`@HiltAndroidApp`, `@AndroidEntryPoint`, `@HiltViewModel`, `@Inject`) | **Aprovado** |
-| Testes unitários e de integração | 25/25 testes aprovados | **Aprovado** |
+- Execução manual em emulador streaming ou dispositivo físico com conexão real à internet para validar:
+  - Resposta real da API MediaWiki (`pt.wikipedia.org`) com o `User-Agent` configurado;
+  - Carregamento real de imagens via rede pelo Coil na leitura online e comportamento de cache em modo avião na leitura offline;
+  - Persistência em disco do arquivo `erudito_database.db` após encerramento completo (*force stop*) e reabertura do processo Android;
+  - Abertura de link externo via navegador (`LocalUriHandler`) no botão `"Abrir na Wikipédia"` e no endereço clicável da `WikipediaArticleScreen` e da `ArticleDetailScreen`.

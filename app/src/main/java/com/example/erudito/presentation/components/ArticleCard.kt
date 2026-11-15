@@ -13,11 +13,13 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Article
+import androidx.compose.material.icons.automirrored.filled.Article
+import androidx.compose.material.icons.filled.BookmarkRemove
 import androidx.compose.material.icons.filled.CloudDone
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -38,7 +40,8 @@ import java.util.Locale
 fun ArticleCard(
     article: Article,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onRemoveFromCollectionClick: (() -> Unit)? = null
 ) {
     val formattedDate = remember(article.lastUpdated) {
         val sdf = SimpleDateFormat("dd/MM/yyyy", Locale("pt", "BR"))
@@ -72,7 +75,7 @@ fun ArticleCard(
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         Icon(
-                            imageVector = Icons.Default.Article,
+                            imageVector = Icons.AutoMirrored.Filled.Article,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.tertiary,
                             modifier = Modifier.size(20.dp)
@@ -96,6 +99,20 @@ fun ArticleCard(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                }
+
+                if (onRemoveFromCollectionClick != null) {
+                    Spacer(modifier = Modifier.width(4.dp))
+                    IconButton(
+                        onClick = onRemoveFromCollectionClick,
+                        modifier = Modifier.testTag("remove_article_button_${article.id}")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.BookmarkRemove,
+                            contentDescription = "Remover ${article.title} da coleção",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
             }
 
