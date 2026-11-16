@@ -15,8 +15,10 @@ data class ArticleDetailUiState(
     val isSavingCollections: Boolean = false,
     val isCreatingCollection: Boolean = false,
     val pickerErrorMessage: String? = null,
-    val isOnline: Boolean = true
+    val isOnline: Boolean = true,
+    val isRefreshing: Boolean = false
 ) {
     val isSavedInAnyCollection: Boolean get() = savedCollectionIds.isNotEmpty()
     val savedCollectionsCount: Int get() = savedCollectionIds.size
+    val canRefreshRemotely: Boolean get() = (article?.wikipediaPageId ?: 0L) > 0L
 }

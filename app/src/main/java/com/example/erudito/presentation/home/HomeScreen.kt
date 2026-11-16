@@ -20,12 +20,17 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Book
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CloudDone
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.CollectionsBookmark
+import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -82,6 +87,8 @@ fun HomeScreen(
         onRenameCollection = { id, name -> viewModel.renameCollection(id, name) },
         onDeleteCollection = { viewModel.deleteCollection(it) },
         onClearError = { viewModel.clearError() },
+        onRetrySync = { viewModel.retrySync() },
+        onDismissSyncStatus = { viewModel.dismissSyncStatus() },
         feedbackEvents = viewModel.feedbackEvents,
         onNavigateToSearch = onNavigateToSearch,
         modifier = modifier
@@ -99,6 +106,8 @@ fun HomeScreenContent(
     onDeleteCollection: (Long) -> Unit,
     modifier: Modifier = Modifier,
     onClearError: () -> Unit = {},
+    onRetrySync: () -> Unit = {},
+    onDismissSyncStatus: () -> Unit = {},
     feedbackEvents: Flow<String> = emptyFlow(),
     onNavigateToSearch: () -> Unit = {}
 ) {
@@ -353,6 +362,16 @@ fun HomeScreenContent(
                     }
                 }
 
+                if (uiState.syncStatus !is HomeSyncStatus.Idle) {
+                    item(key = "home_sync_status_item") {
+                        HomeSyncStatusBanner(
+                            syncStatus = uiState.syncStatus,
+                            onRetry = onRetrySync,
+                            onDismiss = onDismissSyncStatus
+                        )
+                    }
+                }
+
                 // Seção Coleções
                 item {
                     Row(
@@ -469,6 +488,151 @@ fun HomeScreenContent(
                 onDeleteCollection(col.id)
             }
         )
+    }
+}
+
+@Composable
+private fun HomeSyncStatusBanner(
+    syncStatus: HomeSyncStatus,
+    onRetry: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    val containerColor = when (syncStatus) {
+        HomeSyncStatus.Syncing -> MaterialTheme.colorScheme.primaryContainer
+        is HomeSyncStatus.CompletedWithUpdates -> MaterialTheme.colorScheme.secondaryContainer
+        is HomeSyncStatus.CompletedNoChanges -> MaterialTheme.colorScheme.surfaceVariant
+        is HomeSyncStatus.PartialFailure -> MaterialTheme.colorScheme.tertiaryContainer
+        is HomeSyncStatus.Failed -> MaterialTheme.colorScheme.errorContainer
+        HomeSyncStatus.Offline -> MaterialTheme.colorScheme.surfaceVariant
+        HomeSyncStatus.Idle -> return
+    }
+    val contentColor = when (syncStatus) {
+        HomeSyncStatus.Syncing -> MaterialTheme.colorScheme.onPrimaryContainer
+        is HomeSyncStatus.CompletedWithUpdates -> MaterialTheme.colorScheme.onSecondaryContainer
+        is HomeSyncStatus.CompletedNoChanges -> MaterialTheme.colorScheme.onSurfaceVariant
+        is HomeSyncStatus.PartialFailure -> MaterialTheme.colorScheme.onTertiaryContainer
+        is HomeSyncStatus.Failed -> MaterialTheme.colorScheme.onErrorContainer
+        HomeSyncStatus.Offline -> MaterialTheme.colorScheme.onSurfaceVariant
+        HomeSyncStatus.Idle -> return
+    }
+
+    val message = when (syncStatus) {
+        HomeSyncStatus.Syncing -> "Sincronizando artigos salvos..."
+        is HomeSyncStatus.CompletedWithUpdates -> {
+            if (syncStatus.updatedCount == 1) {
+                "Sincronização concluída: 1 artigo atualizado."
+            } else {
+                "Sincronização concluída: ${syncStatus.updatedCount} artigos atualizados."
+            }
+        }
+        is HomeSyncStatus.CompletedNoChanges ->
+            "Artigos verificados: nenhuma alteração encontrada."
+        is HomeSyncStatus.PartialFailure -> {
+            if (syncStatus.updatedCount > 0) {
+                "Sincronização parcial: ${syncStatus.updatedCount} atualizado(s) e ${syncStatus.failedCount} falha(s)."
+            } else {
+                "Sincronização parcial: ${syncStatus.unchangedCount} verificado(s) e ${syncStatus.failedCount} falha(s)."
+            }
+        }
+        is HomeSyncStatus.Failed ->
+            "Falha ao sincronizar os artigos salvos."
+        HomeSyncStatus.Offline ->
+            "Dispositivo offline. Exibindo artigos salvos localmente."
+        HomeSyncStatus.Idle -> ""
+    }
+
+    val showRetry = syncStatus is HomeSyncStatus.PartialFailure || syncStatus is HomeSyncStatus.Failed
+    val showDismiss = syncStatus !is HomeSyncStatus.Syncing && syncStatus !is HomeSyncStatus.Offline
+
+    Surface(
+        shape = RoundedCornerShape(14.dp),
+        color = containerColor,
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("home_sync_status_card")
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 10.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                if (syncStatus is HomeSyncStatus.Syncing) {
+                    CircularProgressIndicator(
+                        strokeWidth = 2.dp,
+                        color = contentColor,
+                        modifier = Modifier
+                            .size(18.dp)
+                            .testTag("home_sync_progress")
+                    )
+                } else {
+                    val icon = when (syncStatus) {
+                        is HomeSyncStatus.CompletedWithUpdates -> Icons.Default.CloudDone
+                        is HomeSyncStatus.CompletedNoChanges -> Icons.Default.CheckCircle
+                        is HomeSyncStatus.PartialFailure -> Icons.Default.Warning
+                        is HomeSyncStatus.Failed -> Icons.Default.ErrorOutline
+                        HomeSyncStatus.Offline -> Icons.Default.CloudOff
+                        HomeSyncStatus.Syncing, HomeSyncStatus.Idle -> Icons.Default.CloudDone
+                    }
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        tint = contentColor,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(10.dp))
+
+                Text(
+                    text = message,
+                    style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
+                    color = contentColor,
+                    modifier = Modifier
+                        .weight(1f)
+                        .testTag("home_sync_status_text")
+                )
+
+                if (showDismiss) {
+                    IconButton(
+                        onClick = onDismiss,
+                        modifier = Modifier
+                            .size(48.dp)
+                            .testTag("home_sync_dismiss_button")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "Dispensar aviso de sincronização",
+                            tint = contentColor,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
+            }
+
+            if (showRetry) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Start
+                ) {
+                    TextButton(
+                        onClick = onRetry,
+                        modifier = Modifier
+                            .heightIn(min = 48.dp)
+                            .testTag("home_sync_retry_button")
+                    ) {
+                        Text(
+                            text = "Tentar novamente",
+                            color = contentColor,
+                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold)
+                        )
+                    }
+                }
+            }
+        }
     }
 }
 

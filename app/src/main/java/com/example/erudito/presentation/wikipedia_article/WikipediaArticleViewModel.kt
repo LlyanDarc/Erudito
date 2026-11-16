@@ -8,6 +8,8 @@ import com.example.erudito.domain.connectivity.ConnectivityObserver
 import com.example.erudito.domain.model.Article
 import com.example.erudito.domain.model.WikipediaArticle
 import com.example.erudito.domain.model.WikipediaException
+import com.example.erudito.domain.sync.RefreshArticleOutcome
+import com.example.erudito.domain.sync.SkipReason
 import com.example.erudito.domain.usecase.AddArticleToCollectionsUseCase
 import com.example.erudito.domain.usecase.CreateCollectionUseCase
 import com.example.erudito.domain.usecase.GetCollectionIdsForArticleUseCase
@@ -15,6 +17,7 @@ import com.example.erudito.domain.usecase.GetCollectionsUseCase
 import com.example.erudito.domain.usecase.GetSavedArticleByWikipediaPageIdUseCase
 import com.example.erudito.domain.usecase.GetSavedArticlesUseCase
 import com.example.erudito.domain.usecase.GetWikipediaArticleUseCase
+import com.example.erudito.domain.usecase.RefreshSavedArticleUseCase
 import com.example.erudito.domain.usecase.RemoveArticleFromCollectionUseCase
 import com.example.erudito.domain.usecase.SaveWikipediaArticleToCollectionsUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -44,6 +47,7 @@ class WikipediaArticleViewModel @Inject constructor(
     private val removeArticleFromCollectionUseCase: RemoveArticleFromCollectionUseCase,
     private val getCollectionIdsForArticleUseCase: GetCollectionIdsForArticleUseCase,
     private val getSavedArticleByWikipediaPageIdUseCase: GetSavedArticleByWikipediaPageIdUseCase,
+    private val refreshSavedArticleUseCase: RefreshSavedArticleUseCase,
     private val connectivityObserver: ConnectivityObserver
 ) : ViewModel() {
 
@@ -56,6 +60,7 @@ class WikipediaArticleViewModel @Inject constructor(
     private var activePageId: Long = pageId
     private var loadJob: Job? = null
     private var collectionIdsJob: Job? = null
+    private var refreshSavedJob: Job? = null
     private var observedArticleKey: Pair<Long, String>? = null
     private var cachedSavedArticles: List<Article> = emptyList()
 
@@ -115,7 +120,26 @@ class WikipediaArticleViewModel @Inject constructor(
                 .catch { /* Mantém cache anterior em caso de falha transitória */ }
                 .collect { articles ->
                     cachedSavedArticles = articles
+                    val displayed = (_uiState.value as? WikipediaArticleUiState.Success)?.article
+                    updateSavedCopyState(displayed)
                 }
+        }
+    }
+
+    private fun updateSavedCopyState(displayedArticle: WikipediaArticle?) {
+        val matched = if (displayedArticle != null) {
+            cachedSavedArticles.find { it.wikipediaPageId == displayedArticle.pageId }
+                ?: cachedSavedArticles.find {
+                    it.wikipediaPageId == null && it.url == displayedArticle.url
+                }
+        } else {
+            cachedSavedArticles.find { it.wikipediaPageId == activePageId }
+        }
+        _collectionsUiState.update {
+            it.copy(
+                savedArticleId = matched?.id,
+                canRefreshSavedCopy = matched != null && (matched.wikipediaPageId ?: 0L) > 0L
+            )
         }
     }
 
@@ -158,7 +182,10 @@ class WikipediaArticleViewModel @Inject constructor(
                 savedCollectionIds = emptySet(),
                 selectedCollectionIds = emptySet(),
                 isPickerVisible = false,
-                pickerErrorMessage = null
+                pickerErrorMessage = null,
+                savedArticleId = null,
+                canRefreshSavedCopy = false,
+                isRefreshingSavedCopy = false
             )
         }
     }
@@ -191,6 +218,7 @@ class WikipediaArticleViewModel @Inject constructor(
                         isLocalFallback = true,
                         localLastUpdated = localArticle.lastUpdated
                     )
+                    updateSavedCopyState(wikiArticle)
                     observeCollectionAssociationsForArticle(wikiArticle)
                 } else {
                     _uiState.value = WikipediaArticleUiState.Error(NO_CONNECTION_MESSAGE)
@@ -202,6 +230,7 @@ class WikipediaArticleViewModel @Inject constructor(
                 val article = getWikipediaArticleUseCase(targetPageId)
                 if (article != null) {
                     _uiState.value = WikipediaArticleUiState.Success(article)
+                    updateSavedCopyState(article)
                     observeCollectionAssociationsForArticle(article)
                 } else {
                     _uiState.value = WikipediaArticleUiState.Error(ARTICLE_NOT_FOUND_MESSAGE)
@@ -217,6 +246,7 @@ class WikipediaArticleViewModel @Inject constructor(
                         isLocalFallback = true,
                         localLastUpdated = localArticle.lastUpdated
                     )
+                    updateSavedCopyState(wikiArticle)
                     observeCollectionAssociationsForArticle(wikiArticle)
                 } else {
                     _uiState.value = WikipediaArticleUiState.Error(e.message)
@@ -396,6 +426,62 @@ class WikipediaArticleViewModel @Inject constructor(
                     )
                 }
                 _feedbackEvents.send(errorMsg)
+            }
+        }
+    }
+
+    fun refreshSavedCopy() {
+        val currentCollectionsState = _collectionsUiState.value
+        val targetArticleId = currentCollectionsState.savedArticleId ?: return
+        if (currentCollectionsState.isRefreshingSavedCopy || refreshSavedJob?.isActive == true) return
+
+        refreshSavedJob = viewModelScope.launch {
+            _collectionsUiState.update { it.copy(isRefreshingSavedCopy = true) }
+            try {
+                val outcome = refreshSavedArticleUseCase(
+                    articleId = targetArticleId,
+                    forceRefresh = true
+                )
+                val message = when (outcome) {
+                    is RefreshArticleOutcome.Updated -> {
+                        val currentSuccess = _uiState.value as? WikipediaArticleUiState.Success
+                        if (currentSuccess != null) {
+                            _uiState.value = currentSuccess.copy(
+                                article = outcome.article.toWikipediaArticle(fallbackPageId = activePageId),
+                                localLastUpdated = outcome.article.lastUpdated
+                            )
+                        }
+                        "Cópia salva atualizada com a versão mais recente da Wikipédia."
+                    }
+                    is RefreshArticleOutcome.Unchanged ->
+                        "A cópia salva já está atualizada. Nenhuma alteração encontrada."
+                    is RefreshArticleOutcome.Skipped -> when (outcome.reason) {
+                        SkipReason.NO_WIKIPEDIA_PAGE_ID ->
+                            "Este artigo local não possui vínculo com a Wikipédia para atualização."
+                        SkipReason.NO_CONNECTION ->
+                            "Dispositivo offline. Não foi possível atualizar a cópia salva agora."
+                        SkipReason.ARTICLE_NOT_FOUND_LOCALLY ->
+                            "Cópia local não encontrada para atualização."
+                        SkipReason.RECENTLY_SYNCED ->
+                            "A cópia salva foi sincronizada recentemente."
+                    }
+                    is RefreshArticleOutcome.Failed -> {
+                        if (outcome.cause is WikipediaException && outcome.message.isNotBlank()) {
+                            outcome.message
+                        } else {
+                            "Não foi possível atualizar a cópia salva. O conteúdo local foi preservado."
+                        }
+                    }
+                }
+                _feedbackEvents.send(message)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                _feedbackEvents.send(
+                    "Não foi possível atualizar a cópia salva. O conteúdo local foi preservado."
+                )
+            } finally {
+                _collectionsUiState.update { it.copy(isRefreshingSavedCopy = false) }
             }
         }
     }

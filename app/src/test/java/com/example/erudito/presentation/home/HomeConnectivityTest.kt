@@ -7,13 +7,19 @@ import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import com.example.erudito.domain.connectivity.FakeConnectivityObserver
+import com.example.erudito.domain.model.WikipediaArticle
+import com.example.erudito.domain.model.WikipediaSearchResult
 import com.example.erudito.domain.repository.FakeArticleRepository
 import com.example.erudito.domain.repository.FakeCollectionRepository
+import com.example.erudito.domain.repository.WikipediaRepository
+import com.example.erudito.domain.sync.SyncPolicy
 import com.example.erudito.domain.usecase.CreateCollectionUseCase
 import com.example.erudito.domain.usecase.DeleteCollectionUseCase
 import com.example.erudito.domain.usecase.GetCollectionsUseCase
 import com.example.erudito.domain.usecase.GetSavedArticlesUseCase
+import com.example.erudito.domain.usecase.RefreshSavedArticleUseCase
 import com.example.erudito.domain.usecase.RenameCollectionUseCase
+import com.example.erudito.domain.usecase.SyncSavedArticlesUseCase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -42,12 +48,28 @@ class HomeConnectivityTest {
             val articleRepo = FakeArticleRepository()
             val connectivityObserver = FakeConnectivityObserver(initialOnline = true)
 
+            val emptyWikipediaRepo = object : WikipediaRepository {
+                override suspend fun searchArticles(query: String): List<WikipediaSearchResult> = emptyList()
+                override suspend fun getArticleByPageId(pageId: Long): WikipediaArticle? = null
+            }
+            val syncUseCase = SyncSavedArticlesUseCase(
+                articleRepository = articleRepo,
+                refreshSavedArticleUseCase = RefreshSavedArticleUseCase(
+                    articleRepository = articleRepo,
+                    wikipediaRepository = emptyWikipediaRepo,
+                    connectivityObserver = connectivityObserver,
+                    syncPolicy = SyncPolicy()
+                ),
+                connectivityObserver = connectivityObserver
+            )
+
             val viewModel = HomeViewModel(
                 getCollectionsUseCase = GetCollectionsUseCase(collectionRepo),
                 getSavedArticlesUseCase = GetSavedArticlesUseCase(articleRepo),
                 createCollectionUseCase = CreateCollectionUseCase(collectionRepo),
                 renameCollectionUseCase = RenameCollectionUseCase(collectionRepo),
                 deleteCollectionUseCase = DeleteCollectionUseCase(collectionRepo),
+                syncSavedArticlesUseCase = syncUseCase,
                 connectivityObserver = connectivityObserver
             )
 

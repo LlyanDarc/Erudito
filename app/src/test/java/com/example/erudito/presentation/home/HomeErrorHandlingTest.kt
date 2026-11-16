@@ -3,13 +3,19 @@ package com.example.erudito.presentation.home
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import com.example.erudito.domain.connectivity.FakeConnectivityObserver
+import com.example.erudito.domain.model.WikipediaArticle
+import com.example.erudito.domain.model.WikipediaSearchResult
 import com.example.erudito.domain.repository.FakeArticleRepository
 import com.example.erudito.domain.repository.FakeCollectionRepository
+import com.example.erudito.domain.repository.WikipediaRepository
+import com.example.erudito.domain.sync.SyncPolicy
 import com.example.erudito.domain.usecase.CreateCollectionUseCase
 import com.example.erudito.domain.usecase.DeleteCollectionUseCase
 import com.example.erudito.domain.usecase.GetCollectionsUseCase
 import com.example.erudito.domain.usecase.GetSavedArticlesUseCase
+import com.example.erudito.domain.usecase.RefreshSavedArticleUseCase
 import com.example.erudito.domain.usecase.RenameCollectionUseCase
+import com.example.erudito.domain.usecase.SyncSavedArticlesUseCase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -69,13 +75,28 @@ class HomeErrorHandlingTest {
         try {
             val collectionRepo = FakeCollectionRepository()
             val articleRepo = FakeArticleRepository()
+            val connectivityObserver = FakeConnectivityObserver()
+            val emptyWikipediaRepo = object : WikipediaRepository {
+                override suspend fun searchArticles(query: String): List<WikipediaSearchResult> = emptyList()
+                override suspend fun getArticleByPageId(pageId: Long): WikipediaArticle? = null
+            }
             val viewModel = HomeViewModel(
                 getCollectionsUseCase = GetCollectionsUseCase(collectionRepo),
                 getSavedArticlesUseCase = GetSavedArticlesUseCase(articleRepo),
                 createCollectionUseCase = CreateCollectionUseCase(collectionRepo),
                 renameCollectionUseCase = RenameCollectionUseCase(collectionRepo),
                 deleteCollectionUseCase = DeleteCollectionUseCase(collectionRepo),
-                connectivityObserver = FakeConnectivityObserver()
+                syncSavedArticlesUseCase = SyncSavedArticlesUseCase(
+                    articleRepository = articleRepo,
+                    refreshSavedArticleUseCase = RefreshSavedArticleUseCase(
+                        articleRepository = articleRepo,
+                        wikipediaRepository = emptyWikipediaRepo,
+                        connectivityObserver = connectivityObserver,
+                        syncPolicy = SyncPolicy()
+                    ),
+                    connectivityObserver = connectivityObserver
+                ),
+                connectivityObserver = connectivityObserver
             )
 
             // Dispara erro de validação RN01 pelo ViewModel

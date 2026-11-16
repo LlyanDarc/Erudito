@@ -137,27 +137,26 @@ A implementação deverá ocorrer progressivamente, com revisão, validação e 
 
 ### Tarefas
 
-- [ ] Definir e implementar o fluxo de leitura priorizando os dados locais.
-- [ ] Garantir a consulta dos artigos salvos sem internet.
-- [ ] Garantir o gerenciamento de coleções sem internet.
-- [ ] Garantir a organização dos artigos armazenados sem internet.
-- [ ] Implementar identificação da disponibilidade de conexão.
-- [ ] Definir a estratégia de atualização dos artigos.
-- [ ] Implementar atualização de conteúdos quando houver conexão.
-- [ ] Preservar os dados locais em caso de falha na API.
-- [ ] Implementar tratamento de falhas de sincronização.
-- [ ] Evitar sobrescrita indevida de dados locais.
-- [ ] Validar a consistência dos artigos e associações.
-- [ ] Realizar testes de funcionamento com e sem conexão.
+- [x] **Etapa 1:** Implementar `ConnectivityObserver` e `AndroidConnectivityObserver` com verificação de `NET_CAPABILITY_INTERNET`, `NET_CAPABILITY_VALIDATED` e `NET_CAPABILITY_NOT_SUSPENDED` (Android P+).
+- [x] **Etapa 1:** Definir e implementar o fluxo de leitura priorizando os dados locais e fallback automático offline/erro de rede na `WikipediaArticleScreen`.
+- [x] **Etapa 1:** Garantir a consulta dos artigos salvos sem internet e observação reativa por `Flow` (`ObserveArticleByIdUseCase`, `GetSavedArticleByWikipediaPageIdUseCase`).
+- [x] **Etapa 1:** Garantir o gerenciamento de coleções e a organização dos artigos armazenados sem internet, mantendo identificação de disponibilidade de conexão nas telas.
+- [x] **Etapa 2:** Evoluir banco Room para versão 3 (`MIGRATION_2_3`) adicionando `lastSyncedAt` preservando registros existentes (`lastSyncedAt = null`) e associações N:N.
+- [x] **Etapa 2:** Definir a estratégia de atualização dos artigos (`SyncPolicy` com intervalo padrão de 6 horas) e `ArticleSyncMerger` com proteção explícita contra conteúdo remoto vazio/inválido (`hasExtractedContent`).
+- [x] **Etapa 2:** Implementar `RefreshSavedArticleUseCase`, `SyncSavedArticlesUseCase` e `SyncResult`, atualizando artigos via `@Update` (sem `OnConflictStrategy.REPLACE`) e tratando colisões de redirecionamento de `wikipediaPageId`.
+- [x] **Etapa 3:** Implementar atualização automática controlada na `HomeScreen` (`HomeViewModel` + `HomeSyncStatusBanner`) respeitando a política de 6 horas e evitando disparos duplicados.
+- [x] **Etapa 3:** Implementar atualização manual sob demanda (`forceRefresh = true`) na `ArticleDetailScreen` (com exibição de `lastSyncedAt` e aviso para artigos sem vínculo remoto) e na cópia salva em `WikipediaArticleScreen`.
+- [x] **Etapa 3:** Implementar proteção contra chamadas simultâneas, propagação de `CancellationException`, encerramento seguro de loading e feedback visual amigável sem exposição de mensagens técnicas.
+- [x] **Etapa 4:** Consolidar documentação (`SPECIFICATION.md`, `PLANNING.md`, `TASKS.md`, `README.md`, `TEST_RESULTS.md`), realizar auditoria técnica e validar compilação e suíte completa de testes.
 
 ### Critérios de conclusão
 
-- Os artigos salvos devem continuar disponíveis offline.
-- As coleções devem continuar funcionando offline.
-- O aplicativo não deve depender da API para apresentar dados já armazenados.
-- A atualização dos artigos deve ocorrer quando houver conexão e conforme a estratégia definida.
-- Falhas de sincronização não devem comprometer os dados locais.
-- O funcionamento offline deve ser demonstrável.
+- [x] Os artigos salvos devem continuar disponíveis offline.
+- [x] As coleções devem continuar funcionando offline.
+- [x] O aplicativo não deve depender da API para apresentar dados já armazenados.
+- [x] A atualização dos artigos deve ocorrer quando houver conexão e conforme a estratégia definida (política de 6 horas + atualização manual).
+- [x] Falhas de sincronização não devem comprometer os dados locais nem vínculos N:N.
+- [x] O funcionamento offline e a sincronização devem estar validados por testes automatizados.
 
 **Commit sugerido:**
 
@@ -210,7 +209,7 @@ A implementação deverá ocorrer progressivamente, com revisão, validação e 
 | 1 | Biblioteca pessoal offline | **Concluído** |
 | 2 | Pesquisa e consulta à Wikipédia | **Concluído** |
 | 3 | Integração entre artigos e coleções | **Concluído** |
-| 4 | Offline First e sincronização | Pendente |
+| 4 | Offline First e sincronização | **Concluído** |
 | 5 | Finalização e validação | Pendente |
 
 ---
@@ -218,4 +217,4 @@ A implementação deverá ocorrer progressivamente, com revisão, validação e 
 **Documento:** TASKS.md  
 **Projeto:** Erudito  
 **Etapa SDD:** Decomposição  
-**Status:** Bundle 3 Concluído
+**Status:** Bundle 4 Concluído

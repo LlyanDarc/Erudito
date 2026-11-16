@@ -3,13 +3,18 @@ package com.example.erudito.presentation.home
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.erudito.domain.connectivity.ConnectivityObserver
+import com.example.erudito.domain.model.Article
+import com.example.erudito.domain.sync.SyncResult
 import com.example.erudito.domain.usecase.CreateCollectionUseCase
 import com.example.erudito.domain.usecase.DeleteCollectionUseCase
 import com.example.erudito.domain.usecase.GetCollectionsUseCase
 import com.example.erudito.domain.usecase.GetSavedArticlesUseCase
 import com.example.erudito.domain.usecase.RenameCollectionUseCase
+import com.example.erudito.domain.usecase.SyncSavedArticlesUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -28,8 +33,13 @@ class HomeViewModel @Inject constructor(
     private val createCollectionUseCase: CreateCollectionUseCase,
     private val renameCollectionUseCase: RenameCollectionUseCase,
     private val deleteCollectionUseCase: DeleteCollectionUseCase,
+    private val syncSavedArticlesUseCase: SyncSavedArticlesUseCase,
     private val connectivityObserver: ConnectivityObserver
 ) : ViewModel() {
+
+    private var hasLoadedInitialLibrary = false
+    private var hasCompletedInitialAutoSync = false
+    private var syncJob: Job? = null
 
     private val _uiState = MutableStateFlow(
         HomeUiState(isOnline = connectivityObserver.isCurrentlyOnline())
@@ -47,7 +57,25 @@ class HomeViewModel @Inject constructor(
     private fun observeConnectivity() {
         viewModelScope.launch {
             connectivityObserver.isOnline.collect { online ->
-                _uiState.update { it.copy(isOnline = online) }
+                _uiState.update { current ->
+                    val nextSyncStatus = when {
+                        online && current.syncStatus is HomeSyncStatus.Offline -> HomeSyncStatus.Idle
+                        !online &&
+                            !current.isSyncing &&
+                            hasLoadedInitialLibrary &&
+                            current.recentArticles.any { (it.wikipediaPageId ?: 0L) > 0L } ->
+                            HomeSyncStatus.Offline
+                        else -> current.syncStatus
+                    }
+                    current.copy(
+                        isOnline = online,
+                        syncStatus = nextSyncStatus
+                    )
+                }
+
+                if (online && hasLoadedInitialLibrary && !hasCompletedInitialAutoSync) {
+                    triggerAutoSyncIfNeeded(_uiState.value.recentArticles)
+                }
             }
         }
     }
@@ -67,6 +95,7 @@ class HomeViewModel @Inject constructor(
                     )
                 }
             }.collect { (collections, articles) ->
+                hasLoadedInitialLibrary = true
                 _uiState.update { current ->
                     current.copy(
                         isLoading = false,
@@ -76,6 +105,154 @@ class HomeViewModel @Inject constructor(
                         totalSavedArticlesCount = articles.size
                     )
                 }
+
+                if (!hasCompletedInitialAutoSync) {
+                    triggerAutoSyncIfNeeded(articles)
+                }
+            }
+        }
+    }
+
+    private fun triggerAutoSyncIfNeeded(articles: List<Article>) {
+        if (hasCompletedInitialAutoSync || syncJob?.isActive == true) return
+        val hasSyncableArticles = articles.any { (it.wikipediaPageId ?: 0L) > 0L }
+        if (!hasSyncableArticles) {
+            return
+        }
+
+        if (!connectivityObserver.isCurrentlyOnline()) {
+            _uiState.update { it.copy(syncStatus = HomeSyncStatus.Offline) }
+            return
+        }
+
+        hasCompletedInitialAutoSync = true
+        launchSync(forceRefresh = false, isAutomatic = true)
+    }
+
+    fun retrySync() {
+        if (!hasLoadedInitialLibrary) return
+        launchSync(forceRefresh = false, isAutomatic = false)
+    }
+
+    fun dismissSyncStatus() {
+        _uiState.update { current ->
+            if (current.isSyncing) current else current.copy(syncStatus = HomeSyncStatus.Idle)
+        }
+    }
+
+    private fun launchSync(forceRefresh: Boolean, isAutomatic: Boolean) {
+        if (syncJob?.isActive == true || _uiState.value.isSyncing) return
+
+        if (!connectivityObserver.isCurrentlyOnline()) {
+            if (isAutomatic) {
+                hasCompletedInitialAutoSync = false
+            }
+            _uiState.update { it.copy(syncStatus = HomeSyncStatus.Offline) }
+            if (!isAutomatic) {
+                viewModelScope.launch {
+                    _feedbackEvents.send("Dispositivo offline. Conecte-se à internet para sincronizar.")
+                }
+            }
+            return
+        }
+
+        syncJob = viewModelScope.launch {
+            _uiState.update { it.copy(syncStatus = HomeSyncStatus.Syncing) }
+            try {
+                val result = syncSavedArticlesUseCase(forceRefresh = forceRefresh)
+                handleSyncResult(result = result, isAutomatic = isAutomatic)
+            } catch (e: CancellationException) {
+                if (isAutomatic) {
+                    hasCompletedInitialAutoSync = false
+                }
+                _uiState.update { current ->
+                    if (current.syncStatus is HomeSyncStatus.Syncing) {
+                        current.copy(syncStatus = HomeSyncStatus.Idle)
+                    } else {
+                        current
+                    }
+                }
+                throw e
+            } catch (_: Exception) {
+                if (isAutomatic) {
+                    hasCompletedInitialAutoSync = false
+                }
+                _uiState.update { it.copy(syncStatus = HomeSyncStatus.Failed(failedCount = 1)) }
+                if (!isAutomatic) {
+                    _feedbackEvents.send("Não foi possível concluir a sincronização dos artigos salvos.")
+                }
+            }
+        }
+    }
+
+    private suspend fun handleSyncResult(result: SyncResult, isAutomatic: Boolean) {
+        when {
+            result.abortedDueToNoConnection -> {
+                if (isAutomatic) {
+                    hasCompletedInitialAutoSync = false
+                }
+                _uiState.update { it.copy(syncStatus = HomeSyncStatus.Offline) }
+                if (!isAutomatic) {
+                    _feedbackEvents.send("Dispositivo offline. Sincronização não executada.")
+                }
+            }
+
+            result.failedCount > 0 && (result.updatedCount > 0 || result.unchangedCount > 0) -> {
+                val status = HomeSyncStatus.PartialFailure(
+                    updatedCount = result.updatedCount,
+                    unchangedCount = result.unchangedCount,
+                    failedCount = result.failedCount
+                )
+                _uiState.update { it.copy(syncStatus = status) }
+                if (!isAutomatic) {
+                    val message = if (result.updatedCount > 0) {
+                        "Sincronização parcial: ${result.updatedCount} atualizado(s) e ${result.failedCount} falha(s)."
+                    } else {
+                        "Sincronização parcial: ${result.unchangedCount} verificado(s) e ${result.failedCount} falha(s)."
+                    }
+                    _feedbackEvents.send(message)
+                }
+            }
+
+            result.failedCount > 0 -> {
+                _uiState.update { it.copy(syncStatus = HomeSyncStatus.Failed(result.failedCount)) }
+                if (!isAutomatic) {
+                    _feedbackEvents.send("Não foi possível sincronizar os artigos salvos no momento.")
+                }
+            }
+
+            result.updatedCount > 0 -> {
+                _uiState.update {
+                    it.copy(
+                        syncStatus = HomeSyncStatus.CompletedWithUpdates(
+                            updatedCount = result.updatedCount,
+                            unchangedCount = result.unchangedCount
+                        )
+                    )
+                }
+                if (!isAutomatic) {
+                    val message = if (result.updatedCount == 1) {
+                        "1 artigo salvo foi atualizado."
+                    } else {
+                        "${result.updatedCount} artigos salvos foram atualizados."
+                    }
+                    _feedbackEvents.send(message)
+                }
+            }
+
+            result.unchangedCount > 0 -> {
+                _uiState.update {
+                    it.copy(
+                        syncStatus = HomeSyncStatus.CompletedNoChanges(
+                            checkedCount = result.unchangedCount
+                        )
+                    )
+                }
+            }
+
+            else -> {
+                // Todos os artigos foram ignorados pela política de frescor ou não possuem pageId remoto
+                _uiState.update { it.copy(syncStatus = HomeSyncStatus.Idle) }
             }
         }
     }

@@ -27,6 +27,7 @@ import androidx.compose.material.icons.filled.BookmarkAdded
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Public
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.WifiOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -98,6 +99,7 @@ fun WikipediaArticleScreen(
         onToggleCollectionSelection = { viewModel.toggleCollectionSelection(it) },
         onCreateCollection = { viewModel.createCollection(it) },
         onConfirmCollectionSelection = { viewModel.confirmCollectionSelection() },
+        onRefreshSavedCopy = { viewModel.refreshSavedCopy() },
         feedbackEvents = viewModel.feedbackEvents,
         modifier = modifier
     )
@@ -119,6 +121,7 @@ fun WikipediaArticleScreenContent(
     onToggleCollectionSelection: (Long) -> Unit = {},
     onCreateCollection: (String) -> Unit = {},
     onConfirmCollectionSelection: () -> Unit = {},
+    onRefreshSavedCopy: () -> Unit = {},
     feedbackEvents: Flow<String> = emptyFlow()
 ) {
     val scrollState = rememberScrollState()
@@ -450,6 +453,38 @@ fun WikipediaArticleScreenContent(
                                     )
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Text("Gerenciar coleções")
+                                }
+
+                                if (collectionsUiState.canRefreshSavedCopy) {
+                                    Spacer(modifier = Modifier.height(10.dp))
+                                    OutlinedButton(
+                                        onClick = onRefreshSavedCopy,
+                                        enabled = !collectionsUiState.isRefreshingSavedCopy,
+                                        shape = RoundedCornerShape(12.dp),
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .heightIn(min = 48.dp)
+                                            .testTag("wikipedia_article_refresh_saved_button")
+                                    ) {
+                                        if (collectionsUiState.isRefreshingSavedCopy) {
+                                            CircularProgressIndicator(
+                                                strokeWidth = 2.dp,
+                                                modifier = Modifier
+                                                    .size(18.dp)
+                                                    .testTag("wikipedia_article_refresh_saved_loading")
+                                            )
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Text("Atualizando cópia salva...")
+                                        } else {
+                                            Icon(
+                                                imageVector = Icons.Default.Refresh,
+                                                contentDescription = null,
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Text("Atualizar cópia salva")
+                                        }
+                                    }
                                 }
                             } else {
                                 Button(

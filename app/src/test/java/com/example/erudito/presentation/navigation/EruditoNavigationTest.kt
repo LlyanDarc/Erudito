@@ -29,6 +29,7 @@ import com.example.erudito.domain.model.WikipediaSearchResult
 import com.example.erudito.domain.repository.FakeArticleRepository
 import com.example.erudito.domain.repository.FakeCollectionRepository
 import com.example.erudito.domain.repository.WikipediaRepository
+import com.example.erudito.domain.sync.SyncPolicy
 import com.example.erudito.domain.usecase.AddArticleToCollectionsUseCase
 import com.example.erudito.domain.usecase.CreateCollectionUseCase
 import com.example.erudito.domain.usecase.DeleteCollectionUseCase
@@ -39,10 +40,12 @@ import com.example.erudito.domain.usecase.GetSavedArticleByWikipediaPageIdUseCas
 import com.example.erudito.domain.usecase.GetSavedArticlesUseCase
 import com.example.erudito.domain.usecase.GetWikipediaArticleUseCase
 import com.example.erudito.domain.usecase.ObserveArticleByIdUseCase
+import com.example.erudito.domain.usecase.RefreshSavedArticleUseCase
 import com.example.erudito.domain.usecase.RemoveArticleFromCollectionUseCase
 import com.example.erudito.domain.usecase.RenameCollectionUseCase
 import com.example.erudito.domain.usecase.SaveWikipediaArticleToCollectionsUseCase
 import com.example.erudito.domain.usecase.SearchWikipediaArticlesUseCase
+import com.example.erudito.domain.usecase.SyncSavedArticlesUseCase
 import com.example.erudito.presentation.article_detail.ArticleDetailViewModel
 import com.example.erudito.presentation.collection_detail.CollectionDetailViewModel
 import com.example.erudito.presentation.collections.CollectionsViewModel
@@ -387,6 +390,17 @@ class EruditoNavigationTest {
         wikipediaRepo: WikipediaRepository,
         connectivityObserver: ConnectivityObserver = FakeConnectivityObserver(initialOnline = true)
     ) {
+        val refreshSavedArticleUseCase = RefreshSavedArticleUseCase(
+            articleRepository = articleRepo,
+            wikipediaRepository = wikipediaRepo,
+            connectivityObserver = connectivityObserver,
+            syncPolicy = SyncPolicy()
+        )
+        val syncSavedArticlesUseCase = SyncSavedArticlesUseCase(
+            articleRepository = articleRepo,
+            refreshSavedArticleUseCase = refreshSavedArticleUseCase,
+            connectivityObserver = connectivityObserver
+        )
         EruditoNavHost(
             navController = navController,
             homeViewModelProvider = { backStackEntry ->
@@ -397,6 +411,7 @@ class EruditoNavigationTest {
                         createCollectionUseCase = CreateCollectionUseCase(collectionRepo),
                         renameCollectionUseCase = RenameCollectionUseCase(collectionRepo),
                         deleteCollectionUseCase = DeleteCollectionUseCase(collectionRepo),
+                        syncSavedArticlesUseCase = syncSavedArticlesUseCase,
                         connectivityObserver = connectivityObserver
                     )
                 }
@@ -435,6 +450,7 @@ class EruditoNavigationTest {
                         ),
                         removeArticleFromCollectionUseCase = RemoveArticleFromCollectionUseCase(articleRepo),
                         getCollectionIdsForArticleUseCase = GetCollectionIdsForArticleUseCase(articleRepo),
+                        refreshSavedArticleUseCase = refreshSavedArticleUseCase,
                         connectivityObserver = connectivityObserver
                     )
                 }
@@ -466,6 +482,7 @@ class EruditoNavigationTest {
                         removeArticleFromCollectionUseCase = RemoveArticleFromCollectionUseCase(articleRepo),
                         getCollectionIdsForArticleUseCase = GetCollectionIdsForArticleUseCase(articleRepo),
                         getSavedArticleByWikipediaPageIdUseCase = GetSavedArticleByWikipediaPageIdUseCase(articleRepo),
+                        refreshSavedArticleUseCase = refreshSavedArticleUseCase,
                         connectivityObserver = connectivityObserver
                     )
                 }

@@ -24,6 +24,7 @@ import com.example.erudito.domain.repository.ArticleRepository
 import com.example.erudito.domain.repository.FakeArticleRepository
 import com.example.erudito.domain.repository.FakeCollectionRepository
 import com.example.erudito.domain.repository.WikipediaRepository
+import com.example.erudito.domain.sync.SyncPolicy
 import com.example.erudito.domain.usecase.AddArticleToCollectionsUseCase
 import com.example.erudito.domain.usecase.CreateCollectionUseCase
 import com.example.erudito.domain.usecase.GetCollectionIdsForArticleUseCase
@@ -31,6 +32,7 @@ import com.example.erudito.domain.usecase.GetCollectionsUseCase
 import com.example.erudito.domain.usecase.GetSavedArticleByWikipediaPageIdUseCase
 import com.example.erudito.domain.usecase.GetSavedArticlesUseCase
 import com.example.erudito.domain.usecase.GetWikipediaArticleUseCase
+import com.example.erudito.domain.usecase.RefreshSavedArticleUseCase
 import com.example.erudito.domain.usecase.RemoveArticleFromCollectionUseCase
 import com.example.erudito.domain.usecase.SaveWikipediaArticleToCollectionsUseCase
 import kotlinx.coroutines.Dispatchers
@@ -79,6 +81,12 @@ class WikipediaArticleScreenTest {
             removeArticleFromCollectionUseCase = RemoveArticleFromCollectionUseCase(articleRepo),
             getCollectionIdsForArticleUseCase = GetCollectionIdsForArticleUseCase(articleRepo),
             getSavedArticleByWikipediaPageIdUseCase = GetSavedArticleByWikipediaPageIdUseCase(articleRepo),
+            refreshSavedArticleUseCase = RefreshSavedArticleUseCase(
+                articleRepository = articleRepo,
+                wikipediaRepository = wikipediaRepo,
+                connectivityObserver = connectivityObserver,
+                syncPolicy = SyncPolicy()
+            ),
             connectivityObserver = connectivityObserver
         )
     }

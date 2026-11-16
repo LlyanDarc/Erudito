@@ -23,7 +23,10 @@ data class WikipediaArticleCollectionsUiState(
     val isSaving: Boolean = false,
     val isCreatingCollection: Boolean = false,
     val pickerErrorMessage: String? = null,
-    val isOnline: Boolean = true
+    val isOnline: Boolean = true,
+    val savedArticleId: Long? = null,
+    val canRefreshSavedCopy: Boolean = false,
+    val isRefreshingSavedCopy: Boolean = false
 ) {
     val isSaved: Boolean get() = savedCollectionIds.isNotEmpty()
     val savedCollectionsCount: Int get() = savedCollectionIds.size

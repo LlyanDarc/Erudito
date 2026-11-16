@@ -10,13 +10,19 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToIndex
 import com.example.erudito.domain.connectivity.FakeConnectivityObserver
+import com.example.erudito.domain.model.WikipediaArticle
+import com.example.erudito.domain.model.WikipediaSearchResult
 import com.example.erudito.domain.repository.FakeArticleRepository
 import com.example.erudito.domain.repository.FakeCollectionRepository
+import com.example.erudito.domain.repository.WikipediaRepository
+import com.example.erudito.domain.sync.SyncPolicy
 import com.example.erudito.domain.usecase.CreateCollectionUseCase
 import com.example.erudito.domain.usecase.DeleteCollectionUseCase
 import com.example.erudito.domain.usecase.GetCollectionsUseCase
 import com.example.erudito.domain.usecase.GetSavedArticlesUseCase
+import com.example.erudito.domain.usecase.RefreshSavedArticleUseCase
 import com.example.erudito.domain.usecase.RenameCollectionUseCase
+import com.example.erudito.domain.usecase.SyncSavedArticlesUseCase
 import com.example.erudito.presentation.home.HomeScreen
 import com.example.erudito.presentation.home.HomeViewModel
 import kotlinx.coroutines.Dispatchers
@@ -49,14 +55,7 @@ class CollectionFeedbackMessagesTest {
         try {
             val collectionRepo = FakeCollectionRepository()
             val articleRepo = FakeArticleRepository()
-            val viewModel = HomeViewModel(
-                getCollectionsUseCase = GetCollectionsUseCase(collectionRepo),
-                getSavedArticlesUseCase = GetSavedArticlesUseCase(articleRepo),
-                createCollectionUseCase = CreateCollectionUseCase(collectionRepo),
-                renameCollectionUseCase = RenameCollectionUseCase(collectionRepo),
-                deleteCollectionUseCase = DeleteCollectionUseCase(collectionRepo),
-                connectivityObserver = FakeConnectivityObserver()
-            )
+            val viewModel = buildHomeViewModel(collectionRepo, articleRepo)
 
             val events = mutableListOf<String>()
             val collectorJob = launch(dispatcher) {
@@ -195,14 +194,7 @@ class CollectionFeedbackMessagesTest {
         try {
             val collectionRepo = FakeCollectionRepository()
             val articleRepo = FakeArticleRepository()
-            val viewModel = HomeViewModel(
-                getCollectionsUseCase = GetCollectionsUseCase(collectionRepo),
-                getSavedArticlesUseCase = GetSavedArticlesUseCase(articleRepo),
-                createCollectionUseCase = CreateCollectionUseCase(collectionRepo),
-                renameCollectionUseCase = RenameCollectionUseCase(collectionRepo),
-                deleteCollectionUseCase = DeleteCollectionUseCase(collectionRepo),
-                connectivityObserver = FakeConnectivityObserver()
-            )
+            val viewModel = buildHomeViewModel(collectionRepo, articleRepo)
 
             composeTestRule.setContent {
                 HomeScreen(
@@ -246,14 +238,7 @@ class CollectionFeedbackMessagesTest {
         try {
             val collectionRepo = FakeCollectionRepository()
             val articleRepo = FakeArticleRepository()
-            val viewModel = HomeViewModel(
-                getCollectionsUseCase = GetCollectionsUseCase(collectionRepo),
-                getSavedArticlesUseCase = GetSavedArticlesUseCase(articleRepo),
-                createCollectionUseCase = CreateCollectionUseCase(collectionRepo),
-                renameCollectionUseCase = RenameCollectionUseCase(collectionRepo),
-                deleteCollectionUseCase = DeleteCollectionUseCase(collectionRepo),
-                connectivityObserver = FakeConnectivityObserver()
-            )
+            val viewModel = buildHomeViewModel(collectionRepo, articleRepo)
 
             composeTestRule.setContent {
                 HomeScreen(
@@ -277,5 +262,34 @@ class CollectionFeedbackMessagesTest {
         } finally {
             Dispatchers.resetMain()
         }
+    }
+
+    private fun buildHomeViewModel(
+        collectionRepo: FakeCollectionRepository,
+        articleRepo: FakeArticleRepository
+    ): HomeViewModel {
+        val connectivityObserver = FakeConnectivityObserver()
+        val emptyWikipediaRepo = object : WikipediaRepository {
+            override suspend fun searchArticles(query: String): List<WikipediaSearchResult> = emptyList()
+            override suspend fun getArticleByPageId(pageId: Long): WikipediaArticle? = null
+        }
+        return HomeViewModel(
+            getCollectionsUseCase = GetCollectionsUseCase(collectionRepo),
+            getSavedArticlesUseCase = GetSavedArticlesUseCase(articleRepo),
+            createCollectionUseCase = CreateCollectionUseCase(collectionRepo),
+            renameCollectionUseCase = RenameCollectionUseCase(collectionRepo),
+            deleteCollectionUseCase = DeleteCollectionUseCase(collectionRepo),
+            syncSavedArticlesUseCase = SyncSavedArticlesUseCase(
+                articleRepository = articleRepo,
+                refreshSavedArticleUseCase = RefreshSavedArticleUseCase(
+                    articleRepository = articleRepo,
+                    wikipediaRepository = emptyWikipediaRepo,
+                    connectivityObserver = connectivityObserver,
+                    syncPolicy = SyncPolicy()
+                ),
+                connectivityObserver = connectivityObserver
+            ),
+            connectivityObserver = connectivityObserver
+        )
     }
 }

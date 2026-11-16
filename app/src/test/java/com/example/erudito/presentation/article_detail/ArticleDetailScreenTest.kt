@@ -19,14 +19,19 @@ import androidx.compose.ui.test.performTextInput
 import androidx.lifecycle.SavedStateHandle
 import com.example.erudito.domain.connectivity.FakeConnectivityObserver
 import com.example.erudito.domain.model.Article
+import com.example.erudito.domain.model.WikipediaArticle
+import com.example.erudito.domain.model.WikipediaSearchResult
 import com.example.erudito.domain.repository.ArticleRepository
 import com.example.erudito.domain.repository.FakeArticleRepository
 import com.example.erudito.domain.repository.FakeCollectionRepository
+import com.example.erudito.domain.repository.WikipediaRepository
+import com.example.erudito.domain.sync.SyncPolicy
 import com.example.erudito.domain.usecase.AddArticleToCollectionsUseCase
 import com.example.erudito.domain.usecase.CreateCollectionUseCase
 import com.example.erudito.domain.usecase.GetCollectionIdsForArticleUseCase
 import com.example.erudito.domain.usecase.GetCollectionsUseCase
 import com.example.erudito.domain.usecase.ObserveArticleByIdUseCase
+import com.example.erudito.domain.usecase.RefreshSavedArticleUseCase
 import com.example.erudito.domain.usecase.RemoveArticleFromCollectionUseCase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -57,6 +62,10 @@ class ArticleDetailScreenTest {
         articleRepo: ArticleRepository,
         connectivityObserver: FakeConnectivityObserver = FakeConnectivityObserver()
     ): ArticleDetailViewModel {
+        val emptyWikipediaRepo = object : WikipediaRepository {
+            override suspend fun searchArticles(query: String): List<WikipediaSearchResult> = emptyList()
+            override suspend fun getArticleByPageId(pageId: Long): WikipediaArticle? = null
+        }
         return ArticleDetailViewModel(
             savedStateHandle = SavedStateHandle(mapOf("articleId" to articleId)),
             observeArticleByIdUseCase = ObserveArticleByIdUseCase(articleRepo),
@@ -68,6 +77,12 @@ class ArticleDetailScreenTest {
             ),
             removeArticleFromCollectionUseCase = RemoveArticleFromCollectionUseCase(articleRepo),
             getCollectionIdsForArticleUseCase = GetCollectionIdsForArticleUseCase(articleRepo),
+            refreshSavedArticleUseCase = RefreshSavedArticleUseCase(
+                articleRepository = articleRepo,
+                wikipediaRepository = emptyWikipediaRepo,
+                connectivityObserver = connectivityObserver,
+                syncPolicy = SyncPolicy()
+            ),
             connectivityObserver = connectivityObserver
         )
     }

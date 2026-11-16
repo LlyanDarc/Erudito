@@ -28,7 +28,9 @@ import androidx.compose.material.icons.filled.BookmarkAdded
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.CloudDone
 import androidx.compose.material.icons.filled.CollectionsBookmark
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Language
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.WifiOff
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -95,6 +97,7 @@ fun ArticleDetailScreen(
         onOpenOriginalUrl = { url ->
             runCatching { uriHandler.openUri(url) }
         },
+        onRefreshArticle = { viewModel.refreshArticle() },
         onOpenCollectionPicker = { viewModel.openCollectionPicker() },
         onDismissCollectionPicker = { viewModel.dismissCollectionPicker() },
         onToggleCollectionSelection = { viewModel.toggleCollectionSelection(it) },
@@ -112,6 +115,7 @@ fun ArticleDetailScreenContent(
     onNavigateBack: () -> Unit,
     modifier: Modifier = Modifier,
     onOpenOriginalUrl: (String) -> Unit = {},
+    onRefreshArticle: () -> Unit = {},
     onOpenCollectionPicker: () -> Unit = {},
     onDismissCollectionPicker: () -> Unit = {},
     onToggleCollectionSelection: (Long) -> Unit = {},
@@ -176,6 +180,13 @@ fun ArticleDetailScreenContent(
             val formattedDate = remember(article.lastUpdated) {
                 val sdf = SimpleDateFormat("dd 'de' MMMM 'de' yyyy", Locale("pt", "BR"))
                 sdf.format(Date(article.lastUpdated))
+            }
+
+            val formattedSyncDate = remember(article.lastSyncedAt) {
+                article.lastSyncedAt?.let { syncedAt ->
+                    val sdf = SimpleDateFormat("dd/MM/yyyy 'às' HH:mm", Locale("pt", "BR"))
+                    sdf.format(Date(syncedAt))
+                }
             }
 
             val associatedCollectionNames = remember(
@@ -350,6 +361,16 @@ fun ArticleDetailScreenContent(
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
                     )
 
+                    if (formattedSyncDate != null) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Última sincronização em $formattedSyncDate",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.testTag("article_detail_last_synced_at")
+                        )
+                    }
+
                     Spacer(modifier = Modifier.height(16.dp))
 
                     val collectionsStatusText = when (uiState.savedCollectionsCount) {
@@ -430,6 +451,65 @@ fun ArticleDetailScreenContent(
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text("Gerenciar coleções")
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    if (uiState.canRefreshRemotely) {
+                        OutlinedButton(
+                            onClick = onRefreshArticle,
+                            enabled = !uiState.isRefreshing,
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(min = 48.dp)
+                                .testTag("article_detail_refresh_button")
+                        ) {
+                            if (uiState.isRefreshing) {
+                                CircularProgressIndicator(
+                                    strokeWidth = 2.dp,
+                                    modifier = Modifier
+                                        .size(18.dp)
+                                        .testTag("article_detail_refresh_loading")
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Atualizando artigo...")
+                            } else {
+                                Icon(
+                                    imageVector = Icons.Default.Refresh,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Atualizar artigo")
+                            }
+                        }
+                    } else {
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("article_detail_no_remote_update_notice")
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Info,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "Artigo local sem vínculo remoto — atualização pela Wikipédia indisponível.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
                     }
 
                     Spacer(modifier = Modifier.height(16.dp))
