@@ -1,9 +1,11 @@
 package com.example.erudito.data.mapper
 
 import com.example.erudito.data.local.entity.ArticleEntity
+import com.example.erudito.data.remote.dto.WikipediaPageDto
 import com.example.erudito.domain.model.Article
 import com.example.erudito.domain.model.WikipediaArticle
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -102,5 +104,38 @@ class ArticleAndWikipediaMapperTest {
         val wikiDomain = wikiEntity.toDomain()
         assertEquals(4L, wikiDomain.id)
         assertEquals(321L, wikiDomain.wikipediaPageId)
+    }
+
+    @Test
+    fun `pageDto toWikipediaArticleOrNull distinguishes real extract from description fallback`() {
+        val withRealExtract = WikipediaPageDto(
+            pageId = 77L,
+            title = "Sócrates",
+            description = "Filósofo grego",
+            extract = "Texto completo extraído da Wikipédia."
+        ).toWikipediaArticleOrNull()!!
+
+        assertTrue(withRealExtract.hasExtractedContent)
+        assertEquals("Texto completo extraído da Wikipédia.", withRealExtract.content)
+
+        val withNullExtractFallback = WikipediaPageDto(
+            pageId = 78L,
+            title = "Tales",
+            description = "Primeiro filósofo ocidental",
+            extract = null
+        ).toWikipediaArticleOrNull()!!
+
+        assertFalse(withNullExtractFallback.hasExtractedContent)
+        assertEquals("Primeiro filósofo ocidental", withNullExtractFallback.content)
+
+        val withBlankExtractFallback = WikipediaPageDto(
+            pageId = 79L,
+            title = "Anaximandro",
+            description = "Filósofo pré-socrático",
+            extract = "   "
+        ).toWikipediaArticleOrNull()!!
+
+        assertFalse(withBlankExtractFallback.hasExtractedContent)
+        assertEquals("Filósofo pré-socrático", withBlankExtractFallback.content)
     }
 }

@@ -109,7 +109,7 @@ class ArticleSyncMergerAndPolicyTest {
     }
 
     @Test
-    fun mergeNeverOverwritesValidLocalContentWithDescriptionOnlyFallbackFromDto() {
+    fun mergeNeverOverwritesValidLocalContentWithDescriptionOnlyFallbackFromNullExtract() {
         val local = sampleLocalArticle()
         val dtoWithoutExtract = WikipediaPageDto(
             pageId = 123L,
@@ -120,6 +120,9 @@ class ArticleSyncMergerAndPolicyTest {
         )
         val remote = dtoWithoutExtract.toWikipediaArticleOrNull()!!
 
+        assertFalse(remote.hasExtractedContent)
+        assertEquals("Filósofo grego clássico", remote.content)
+
         val result = ArticleSyncMerger.merge(
             local = local,
             remote = remote,
@@ -129,7 +132,112 @@ class ArticleSyncMergerAndPolicyTest {
         assertFalse(result.hasContentChanged)
         assertEquals(local.content, result.article.content)
         assertEquals(local.imageUrl, result.article.imageUrl)
+        assertEquals(local.lastUpdated, result.article.lastUpdated)
         assertEquals(7_000L, result.article.lastSyncedAt)
+    }
+
+    @Test
+    fun mergeNeverOverwritesLocalContentShorterThanRemoteDescriptionWhenExtractIsNullOrEmpty() {
+        val shortLocalContent = "Resumo curto."
+        val longDescription = "Filósofo grego clássico, discípulo de Sócrates e fundador da Academia de Atenas."
+        assertTrue(shortLocalContent.length < longDescription.length)
+
+        val local = sampleLocalArticle(
+            description = longDescription,
+            content = shortLocalContent
+        )
+
+        val remoteNullExtract = WikipediaPageDto(
+            pageId = 123L,
+            title = "Platão",
+            description = longDescription,
+            extract = null,
+            fullUrl = "https://pt.wikipedia.org/wiki/Plat%C3%A3o"
+        ).toWikipediaArticleOrNull()!!
+
+        val resultNull = ArticleSyncMerger.merge(local = local, remote = remoteNullExtract, syncedAtMs = 7_100L)
+        assertFalse(remoteNullExtract.hasExtractedContent)
+        assertEquals(shortLocalContent, resultNull.article.content)
+        assertFalse(resultNull.hasContentChanged)
+        assertEquals(local.lastUpdated, resultNull.article.lastUpdated)
+        assertEquals(7_100L, resultNull.article.lastSyncedAt)
+
+        val remoteEmptyExtract = WikipediaPageDto(
+            pageId = 123L,
+            title = "Platão",
+            description = longDescription,
+            extract = "   ",
+            fullUrl = "https://pt.wikipedia.org/wiki/Plat%C3%A3o"
+        ).toWikipediaArticleOrNull()!!
+
+        val resultEmpty = ArticleSyncMerger.merge(local = local, remote = remoteEmptyExtract, syncedAtMs = 7_200L)
+        assertFalse(remoteEmptyExtract.hasExtractedContent)
+        assertEquals(shortLocalContent, resultEmpty.article.content)
+        assertFalse(resultEmpty.hasContentChanged)
+        assertEquals(local.lastUpdated, resultEmpty.article.lastUpdated)
+        assertEquals(7_200L, resultEmpty.article.lastSyncedAt)
+    }
+
+    @Test
+    fun mergeNeverOverwritesLocalContentEqualInLengthToRemoteDescriptionWhenExtractIsMissing() {
+        val remoteDescription = "Filósofo grego antigo"
+        val exactSameLengthLocal = "A".repeat(remoteDescription.length)
+        assertEquals(remoteDescription.length, exactSameLengthLocal.length)
+
+        val local = sampleLocalArticle(
+            description = "Descrição antiga",
+            content = exactSameLengthLocal
+        )
+        val remote = WikipediaPageDto(
+            pageId = 123L,
+            title = "Platão",
+            description = remoteDescription,
+            extract = "",
+            fullUrl = "https://pt.wikipedia.org/wiki/Plat%C3%A3o"
+        ).toWikipediaArticleOrNull()!!
+
+        assertFalse(remote.hasExtractedContent)
+
+        val result = ArticleSyncMerger.merge(
+            local = local,
+            remote = remote,
+            syncedAtMs = 7_500L
+        )
+
+        assertTrue(result.hasContentChanged) // descrição mudou
+        assertEquals(remoteDescription, result.article.description)
+        assertEquals(exactSameLengthLocal, result.article.content)
+        assertEquals(7_500L, result.article.lastUpdated)
+        assertEquals(7_500L, result.article.lastSyncedAt)
+    }
+
+    @Test
+    fun mergeUpdatesContentWhenRealExtractIsValidEvenIfIdenticalToDescription() {
+        val local = sampleLocalArticle(
+            description = "Filósofo grego",
+            content = "Conteúdo anterior detalhado sobre o filósofo grego na antiguidade."
+        )
+        val dtoWithRealExtract = WikipediaPageDto(
+            pageId = 123L,
+            title = "Platão",
+            description = "Filósofo grego",
+            extract = "Filósofo grego",
+            fullUrl = "https://pt.wikipedia.org/wiki/Plat%C3%A3o"
+        )
+        val remote = dtoWithRealExtract.toWikipediaArticleOrNull()!!
+
+        assertTrue(remote.hasExtractedContent)
+
+        val result = ArticleSyncMerger.merge(
+            local = local,
+            remote = remote,
+            syncedAtMs = 7_800L
+        )
+
+        assertTrue(result.hasContentChanged)
+        assertEquals("Filósofo grego", result.article.content)
+        assertEquals(7_800L, result.article.lastUpdated)
+        assertEquals(7_800L, result.article.lastSyncedAt)
     }
 
     @Test

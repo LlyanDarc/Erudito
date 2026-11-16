@@ -23,18 +23,13 @@ object ArticleSyncMerger {
         val mergedImageUrl = remote.imageUrl?.trim()?.takeIf { it.isNotEmpty() }
             ?: local.imageUrl
 
-        val remoteContentTrimmed = remote.content.trim()
-        val remoteDescriptionTrimmed = remote.description?.trim()
-        val isDescriptionOnlyFallback = remoteDescriptionTrimmed != null &&
-            remoteContentTrimmed == remoteDescriptionTrimmed &&
-            !local.content.isNullOrBlank() &&
-            local.content.trim().length > remoteContentTrimmed.length
-
-        val mergedContent = if (remoteContentTrimmed.isEmpty() || isDescriptionOnlyFallback) {
-            local.content
+        val extractedRemoteContent = if (remote.hasExtractedContent) {
+            remote.content.trim().takeIf { it.isNotEmpty() }
         } else {
-            remoteContentTrimmed
+            null
         }
+
+        val mergedContent = extractedRemoteContent ?: local.content
 
         val hasContentChanged =
             mergedTitle != local.title ||

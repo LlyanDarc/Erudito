@@ -45,7 +45,8 @@ fun WikipediaPageDto.toWikipediaArticleOrNull(): WikipediaArticle? {
     val id = pageId?.takeIf { it > 0L } ?: return null
     val safeTitle = title?.trim()?.takeIf { it.isNotEmpty() } ?: return null
     val safeDescription = description?.trim()?.takeIf { it.isNotEmpty() }
-    val safeContent = extract?.trim()?.takeIf { it.isNotEmpty() }
+    val extractedContent = extract?.trim()?.takeIf { it.isNotEmpty() }
+    val safeContent = extractedContent
         ?: safeDescription
         ?: ""
     val safeImageUrl = (original?.source ?: thumbnail?.source)?.trim()?.takeIf { it.isNotEmpty() }
@@ -58,7 +59,8 @@ fun WikipediaPageDto.toWikipediaArticleOrNull(): WikipediaArticle? {
         description = safeDescription,
         content = safeContent,
         imageUrl = safeImageUrl,
-        url = safeUrl
+        url = safeUrl,
+        hasExtractedContent = extractedContent != null
     )
 }
 
@@ -80,13 +82,15 @@ fun WikipediaArticle.toDomainArticle(
 }
 
 fun Article.toWikipediaArticle(fallbackPageId: Long = 0L): WikipediaArticle {
+    val localExtracted = content?.trim()?.takeIf { it.isNotEmpty() }
     return WikipediaArticle(
         pageId = wikipediaPageId ?: fallbackPageId,
         title = title,
         description = description,
-        content = content?.takeIf { it.isNotBlank() } ?: description ?: "",
+        content = localExtracted ?: description ?: "",
         imageUrl = imageUrl,
-        url = url
+        url = url,
+        hasExtractedContent = localExtracted != null
     )
 }
 

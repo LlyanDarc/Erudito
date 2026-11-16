@@ -6,5 +6,6 @@ data class WikipediaArticle(
     val description: String? = null,
     val content: String,
     val imageUrl: String? = null,
-    val url: String
+    val url: String,
+    val hasExtractedContent: Boolean = content.isNotBlank()
 )
