@@ -1,5 +1,6 @@
 package com.example.erudito.presentation.search
 
+import com.example.erudito.domain.connectivity.FakeConnectivityObserver
 import com.example.erudito.domain.model.WikipediaArticle
 import com.example.erudito.domain.model.WikipediaException
 import com.example.erudito.domain.model.WikipediaSearchResult
@@ -9,6 +10,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runCurrent
@@ -25,26 +27,40 @@ import org.junit.Test
 class SearchViewModelTest {
 
     private lateinit var fakeRepository: FakeWikipediaRepository
-    private lateinit var viewModel: SearchViewModel
+    private lateinit var fakeConnectivityObserver: FakeConnectivityObserver
 
     @Before
     fun setUp() {
         fakeRepository = FakeWikipediaRepository()
-        viewModel = SearchViewModel(
-            searchWikipediaArticlesUseCase = SearchWikipediaArticlesUseCase(fakeRepository)
+        fakeConnectivityObserver = FakeConnectivityObserver(initialOnline = true)
+    }
+
+    private fun buildViewModel(
+        connectivityObserver: FakeConnectivityObserver = fakeConnectivityObserver
+    ): SearchViewModel {
+        return SearchViewModel(
+            searchWikipediaArticlesUseCase = SearchWikipediaArticlesUseCase(fakeRepository),
+            connectivityObserver = connectivityObserver
         )
     }
 
     @Test
     fun `initial state is SearchContentState Initial with empty query and no error`() {
-        val state = viewModel.uiState.value
+        val dispatcher = UnconfinedTestDispatcher()
+        Dispatchers.setMain(dispatcher)
+        try {
+            val viewModel = buildViewModel()
+            val state = viewModel.uiState.value
 
-        assertEquals("", state.query)
-        assertFalse(state.isLoading)
-        assertFalse(state.hasSearched)
-        assertTrue(state.results.isEmpty())
-        assertNull(state.errorMessage)
-        assertEquals(SearchContentState.Initial, state.contentState)
+            assertEquals("", state.query)
+            assertFalse(state.isLoading)
+            assertFalse(state.hasSearched)
+            assertTrue(state.results.isEmpty())
+            assertNull(state.errorMessage)
+            assertEquals(SearchContentState.Initial, state.contentState)
+        } finally {
+            Dispatchers.resetMain()
+        }
     }
 
     @Test
@@ -52,6 +68,7 @@ class SearchViewModelTest {
         val dispatcher = StandardTestDispatcher(testScheduler)
         Dispatchers.setMain(dispatcher)
         try {
+            val viewModel = buildViewModel()
             val expectedResults = listOf(
                 WikipediaSearchResult(
                     pageId = 101L,
@@ -95,6 +112,7 @@ class SearchViewModelTest {
         val dispatcher = StandardTestDispatcher(testScheduler)
         Dispatchers.setMain(dispatcher)
         try {
+            val viewModel = buildViewModel()
             fakeRepository.nextResults = emptyList()
 
             viewModel.onQueryChange("xpto999inexistente")
@@ -118,6 +136,7 @@ class SearchViewModelTest {
         val dispatcher = StandardTestDispatcher(testScheduler)
         Dispatchers.setMain(dispatcher)
         try {
+            val viewModel = buildViewModel()
             viewModel.onQueryChange("")
             viewModel.search()
             advanceUntilIdle()
@@ -138,6 +157,7 @@ class SearchViewModelTest {
         val dispatcher = StandardTestDispatcher(testScheduler)
         Dispatchers.setMain(dispatcher)
         try {
+            val viewModel = buildViewModel()
             viewModel.onQueryChange("   \t\n  ")
             viewModel.search()
             advanceUntilIdle()
@@ -158,6 +178,7 @@ class SearchViewModelTest {
         val dispatcher = StandardTestDispatcher(testScheduler)
         Dispatchers.setMain(dispatcher)
         try {
+            val viewModel = buildViewModel()
             val gate = CompletableDeferred<List<WikipediaSearchResult>>()
             fakeRepository.pendingDeferred = gate
 
@@ -194,6 +215,7 @@ class SearchViewModelTest {
         val dispatcher = StandardTestDispatcher(testScheduler)
         Dispatchers.setMain(dispatcher)
         try {
+            val viewModel = buildViewModel()
             fakeRepository.exceptionToThrow = WikipediaException.NoConnection()
 
             viewModel.onQueryChange("Aristóteles")
@@ -221,6 +243,7 @@ class SearchViewModelTest {
         val dispatcher = StandardTestDispatcher(testScheduler)
         Dispatchers.setMain(dispatcher)
         try {
+            val viewModel = buildViewModel()
             fakeRepository.exceptionToThrow = WikipediaException.Timeout()
             viewModel.onQueryChange("Renascimento")
             viewModel.search()
@@ -257,6 +280,7 @@ class SearchViewModelTest {
         val dispatcher = StandardTestDispatcher(testScheduler)
         Dispatchers.setMain(dispatcher)
         try {
+            val viewModel = buildViewModel()
             fakeRepository.exceptionToThrow = WikipediaException.ApiError(
                 code = "badquery",
                 message = "Consulta inválida na API."
@@ -272,7 +296,55 @@ class SearchViewModelTest {
             assertNull(viewModel.uiState.value.errorMessage)
 
             viewModel.clearSearch()
-            assertEquals(SearchUiState(), viewModel.uiState.value)
+            assertEquals(SearchUiState(isOnline = true), viewModel.uiState.value)
+        } finally {
+            Dispatchers.resetMain()
+        }
+    }
+
+    @Test
+    fun `search when offline emits NoConnection error without invoking repository and updates isOnline reactively`() = runTest {
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        Dispatchers.setMain(dispatcher)
+        try {
+            val offlineObserver = FakeConnectivityObserver(initialOnline = false)
+            val offlineViewModel = buildViewModel(connectivityObserver = offlineObserver)
+            advanceUntilIdle()
+
+            assertFalse(offlineViewModel.uiState.value.isOnline)
+
+            offlineViewModel.onQueryChange("Sócrates")
+            offlineViewModel.search()
+            advanceUntilIdle()
+
+            assertEquals(0, fakeRepository.searchCallCount)
+            val errorState = offlineViewModel.uiState.value
+            assertFalse(errorState.isLoading)
+            assertTrue(errorState.hasSearched)
+            assertEquals(
+                "Sem conexão com a internet. Verifique sua rede e tente novamente.",
+                errorState.errorMessage
+            )
+
+            // Ao recuperar conexão, isOnline atualiza e nova busca funciona
+            val expected = listOf(
+                WikipediaSearchResult(
+                    pageId = 42L,
+                    title = "Sócrates",
+                    url = "https://pt.wikipedia.org/wiki/S%C3%B3crates"
+                )
+            )
+            fakeRepository.nextResults = expected
+            offlineObserver.setOnline(true)
+            advanceUntilIdle()
+
+            assertTrue(offlineViewModel.uiState.value.isOnline)
+
+            offlineViewModel.retry()
+            advanceUntilIdle()
+
+            assertEquals(1, fakeRepository.searchCallCount)
+            assertEquals(SearchContentState.Success(expected), offlineViewModel.uiState.value.contentState)
         } finally {
             Dispatchers.resetMain()
         }

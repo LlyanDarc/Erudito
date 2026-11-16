@@ -22,6 +22,9 @@ abstract class ArticleDao {
     @Query("SELECT * FROM articles WHERE id = :id")
     abstract suspend fun getArticleById(id: Long): ArticleEntity?
 
+    @Query("SELECT * FROM articles WHERE id = :id")
+    abstract fun observeArticleById(id: Long): Flow<ArticleEntity?>
+
     @Query("SELECT * FROM articles WHERE wikipediaPageId = :wikipediaPageId LIMIT 1")
     abstract suspend fun getArticleByWikipediaPageId(wikipediaPageId: Long): ArticleEntity?
 
@@ -99,7 +102,8 @@ abstract class ArticleDao {
         val targetArticleId = if (existing != null) {
             val updated = article.copy(
                 id = existing.id,
-                wikipediaPageId = article.wikipediaPageId ?: existing.wikipediaPageId
+                wikipediaPageId = article.wikipediaPageId ?: existing.wikipediaPageId,
+                lastSyncedAt = article.lastSyncedAt ?: existing.lastSyncedAt
             )
             updateArticle(updated)
             existing.id

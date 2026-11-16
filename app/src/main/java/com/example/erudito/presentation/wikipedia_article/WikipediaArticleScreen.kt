@@ -4,6 +4,8 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -22,6 +24,7 @@ import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.BookmarkAdd
 import androidx.compose.material.icons.filled.BookmarkAdded
+import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.WifiOff
@@ -39,6 +42,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -99,6 +103,7 @@ fun WikipediaArticleScreen(
     )
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun WikipediaArticleScreenContent(
     uiState: WikipediaArticleUiState,
@@ -130,10 +135,16 @@ fun WikipediaArticleScreenContent(
         }
     }
 
+    val topBarTitle = if (uiState is WikipediaArticleUiState.Success && uiState.isLocalFallback) {
+        "Leitura Local (Offline)"
+    } else {
+        "Leitura Online"
+    }
+
     Scaffold(
         topBar = {
             EruditoTopAppBar(
-                title = "Leitura Online",
+                title = topBarTitle,
                 canNavigateBack = true,
                 onNavigateBack = onNavigateBack
             )
@@ -200,31 +211,52 @@ fun WikipediaArticleScreenContent(
                                 .fillMaxWidth()
                                 .padding(horizontal = 20.dp, vertical = 16.dp)
                         ) {
-                            Row(
+                            FlowRow(
                                 horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalAlignment = Alignment.CenterVertically
+                                verticalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
                                 Surface(
                                     shape = RoundedCornerShape(8.dp),
-                                    color = MaterialTheme.colorScheme.primaryContainer
+                                    color = if (uiState.isLocalFallback) {
+                                        MaterialTheme.colorScheme.secondaryContainer
+                                    } else {
+                                        MaterialTheme.colorScheme.primaryContainer
+                                    },
+                                    modifier = Modifier.testTag("wikipedia_article_source_badge")
                                 ) {
                                     Row(
                                         verticalAlignment = Alignment.CenterVertically,
                                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
                                     ) {
                                         Icon(
-                                            imageVector = Icons.Default.Public,
+                                            imageVector = if (uiState.isLocalFallback) {
+                                                Icons.Default.CloudOff
+                                            } else {
+                                                Icons.Default.Public
+                                            },
                                             contentDescription = null,
-                                            tint = MaterialTheme.colorScheme.primary,
+                                            tint = if (uiState.isLocalFallback) {
+                                                MaterialTheme.colorScheme.onSecondaryContainer
+                                            } else {
+                                                MaterialTheme.colorScheme.primary
+                                            },
                                             modifier = Modifier.size(14.dp)
                                         )
                                         Spacer(modifier = Modifier.width(4.dp))
                                         Text(
-                                            text = "Consulta Online",
+                                            text = if (uiState.isLocalFallback) {
+                                                "Cópia Local Offline"
+                                            } else {
+                                                "Consulta Online"
+                                            },
                                             style = MaterialTheme.typography.labelSmall.copy(
                                                 fontWeight = FontWeight.Bold
                                             ),
-                                            color = MaterialTheme.colorScheme.primary
+                                            color = if (uiState.isLocalFallback) {
+                                                MaterialTheme.colorScheme.onSecondaryContainer
+                                            } else {
+                                                MaterialTheme.colorScheme.primary
+                                            }
                                         )
                                     }
                                 }
@@ -241,6 +273,66 @@ fun WikipediaArticleScreenContent(
                                         color = MaterialTheme.colorScheme.onSecondaryContainer,
                                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
                                     )
+                                }
+
+                                if (!collectionsUiState.isOnline && !uiState.isLocalFallback) {
+                                    Surface(
+                                        shape = RoundedCornerShape(8.dp),
+                                        color = MaterialTheme.colorScheme.tertiaryContainer,
+                                        modifier = Modifier.testTag("wikipedia_article_connectivity_badge")
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.WifiOff,
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.onTertiaryContainer,
+                                                modifier = Modifier.size(14.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text(
+                                                text = "Sem conexão",
+                                                style = MaterialTheme.typography.labelSmall.copy(
+                                                    fontWeight = FontWeight.Bold
+                                                ),
+                                                color = MaterialTheme.colorScheme.onTertiaryContainer
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+
+                            if (uiState.isLocalFallback) {
+                                Spacer(modifier = Modifier.height(12.dp))
+                                Surface(
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = MaterialTheme.colorScheme.tertiaryContainer,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .testTag("wikipedia_article_offline_fallback_banner")
+                                ) {
+                                    Column(
+                                        modifier = Modifier.padding(12.dp)
+                                    ) {
+                                        Text(
+                                            text = "Exibindo a versão salva localmente porque não foi possível carregar a página online.",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onTertiaryContainer
+                                        )
+                                        if (collectionsUiState.isOnline) {
+                                            Spacer(modifier = Modifier.height(4.dp))
+                                            TextButton(
+                                                onClick = onRetry,
+                                                modifier = Modifier
+                                                    .heightIn(min = 48.dp)
+                                                    .testTag("wikipedia_article_reload_online_button")
+                                            ) {
+                                                Text("Atualizar leitura online")
+                                            }
+                                        }
+                                    }
                                 }
                             }
 

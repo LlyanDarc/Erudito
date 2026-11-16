@@ -19,5 +19,6 @@ data class ArticleEntity(
     val content: String?,
     val imageUrl: String?,
     val lastUpdated: Long = System.currentTimeMillis(),
-    val wikipediaPageId: Long? = null
+    val wikipediaPageId: Long? = null,
+    val lastSyncedAt: Long? = null
 )

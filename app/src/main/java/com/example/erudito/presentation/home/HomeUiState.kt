@@ -9,5 +9,6 @@ data class HomeUiState(
     val recentArticles: List<Article> = emptyList(),
     val totalCollectionsCount: Int = 0,
     val totalSavedArticlesCount: Int = 0,
+    val isOnline: Boolean = true,
     val error: String? = null
 )

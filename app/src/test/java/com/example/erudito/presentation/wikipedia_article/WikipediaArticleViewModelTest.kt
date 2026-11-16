@@ -1,6 +1,7 @@
 package com.example.erudito.presentation.wikipedia_article
 
 import androidx.lifecycle.SavedStateHandle
+import com.example.erudito.domain.connectivity.FakeConnectivityObserver
 import com.example.erudito.domain.model.Article
 import com.example.erudito.domain.model.WikipediaArticle
 import com.example.erudito.domain.model.WikipediaException
@@ -13,6 +14,7 @@ import com.example.erudito.domain.usecase.AddArticleToCollectionsUseCase
 import com.example.erudito.domain.usecase.CreateCollectionUseCase
 import com.example.erudito.domain.usecase.GetCollectionIdsForArticleUseCase
 import com.example.erudito.domain.usecase.GetCollectionsUseCase
+import com.example.erudito.domain.usecase.GetSavedArticleByWikipediaPageIdUseCase
 import com.example.erudito.domain.usecase.GetSavedArticlesUseCase
 import com.example.erudito.domain.usecase.GetWikipediaArticleUseCase
 import com.example.erudito.domain.usecase.RemoveArticleFromCollectionUseCase
@@ -53,7 +55,8 @@ class WikipediaArticleViewModelTest {
     private fun createViewModel(
         savedStateHandle: SavedStateHandle = SavedStateHandle(),
         articleRepo: ArticleRepository = fakeArticleRepository,
-        collectionRepo: FakeCollectionRepository = fakeCollectionRepository
+        collectionRepo: FakeCollectionRepository = fakeCollectionRepository,
+        connectivityObserver: FakeConnectivityObserver = FakeConnectivityObserver()
     ): WikipediaArticleViewModel {
         return WikipediaArticleViewModel(
             savedStateHandle = savedStateHandle,
@@ -70,7 +73,9 @@ class WikipediaArticleViewModelTest {
                 collectionRepository = collectionRepo
             ),
             removeArticleFromCollectionUseCase = RemoveArticleFromCollectionUseCase(articleRepo),
-            getCollectionIdsForArticleUseCase = GetCollectionIdsForArticleUseCase(articleRepo)
+            getCollectionIdsForArticleUseCase = GetCollectionIdsForArticleUseCase(articleRepo),
+            getSavedArticleByWikipediaPageIdUseCase = GetSavedArticleByWikipediaPageIdUseCase(articleRepo),
+            connectivityObserver = connectivityObserver
         )
     }
 
@@ -587,6 +592,120 @@ class WikipediaArticleViewModelTest {
             assertEquals("Erro ao gravar no banco", viewModel.collectionsUiState.value.pickerErrorMessage)
             assertEquals("Erro ao gravar no banco", feedbackMessages.last())
             collectorJob.cancel()
+        } finally {
+            Dispatchers.resetMain()
+        }
+    }
+
+    @Test
+    fun `offline mode serves saved local article without network call and keeps collection associations`() = runTest {
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        Dispatchers.setMain(dispatcher)
+        try {
+            val col1 = fakeCollectionRepository.createCollection("Filosofia")
+            fakeArticleRepository.saveArticleAndAssociateCollections(
+                Article(
+                    title = "Sócrates",
+                    description = "Filósofo grego clássico",
+                    content = "Conteúdo salvo localmente para leitura offline.",
+                    imageUrl = null,
+                    url = "https://pt.wikipedia.org/wiki/S%C3%B3crates",
+                    lastUpdated = 123456L,
+                    wikipediaPageId = 42L
+                ),
+                listOf(col1)
+            )
+            val offlineObserver = FakeConnectivityObserver(initialOnline = false)
+
+            val viewModel = createViewModel(
+                savedStateHandle = SavedStateHandle(mapOf(WikipediaArticleViewModel.ARG_PAGE_ID to 42L)),
+                connectivityObserver = offlineObserver
+            )
+            advanceUntilIdle()
+
+            assertEquals(0, fakeRepository.getArticleCallCount)
+            assertFalse(viewModel.collectionsUiState.value.isOnline)
+            val state = viewModel.uiState.value as WikipediaArticleUiState.Success
+            assertTrue(state.isLocalFallback)
+            assertEquals(123456L, state.localLastUpdated)
+            assertEquals("Sócrates", state.article.title)
+            assertEquals("Conteúdo salvo localmente para leitura offline.", state.article.content)
+            assertEquals(setOf(col1), viewModel.collectionsUiState.value.savedCollectionIds)
+        } finally {
+            Dispatchers.resetMain()
+        }
+    }
+
+    @Test
+    fun `offline mode with unsaved article emits connection error without network call or local persistence`() = runTest {
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        Dispatchers.setMain(dispatcher)
+        try {
+            val offlineObserver = FakeConnectivityObserver(initialOnline = false)
+            val viewModel = createViewModel(
+                savedStateHandle = SavedStateHandle(mapOf(WikipediaArticleViewModel.ARG_PAGE_ID to 999L)),
+                connectivityObserver = offlineObserver
+            )
+            advanceUntilIdle()
+
+            assertEquals(0, fakeRepository.getArticleCallCount)
+            assertEquals(
+                WikipediaArticleUiState.Error(
+                    "Sem conexão com a internet. Verifique sua rede e tente novamente."
+                ),
+                viewModel.uiState.value
+            )
+            assertTrue(fakeArticleRepository.getSavedArticles().first().isEmpty())
+        } finally {
+            Dispatchers.resetMain()
+        }
+    }
+
+    @Test
+    fun `online API failure falls back to locally saved copy when available and retry recovers online`() = runTest {
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        Dispatchers.setMain(dispatcher)
+        try {
+            val col1 = fakeCollectionRepository.createCollection("Física")
+            fakeArticleRepository.saveArticleAndAssociateCollections(
+                Article(
+                    title = "Albert Einstein",
+                    description = "Cópia local",
+                    content = "Texto local salvo.",
+                    url = "https://pt.wikipedia.org/wiki/Albert_Einstein",
+                    lastUpdated = 9000L,
+                    wikipediaPageId = 55L
+                ),
+                listOf(col1)
+            )
+            fakeRepository.exceptionToThrow = WikipediaException.Timeout()
+
+            val viewModel = createViewModel(
+                savedStateHandle = SavedStateHandle(mapOf(WikipediaArticleViewModel.ARG_PAGE_ID to 55L))
+            )
+            advanceUntilIdle()
+
+            val fallbackState = viewModel.uiState.value as WikipediaArticleUiState.Success
+            assertTrue(fallbackState.isLocalFallback)
+            assertEquals("Texto local salvo.", fallbackState.article.content)
+
+            // Ao recuperar a API e tentar novamente, volta a exibir versão online
+            val onlineArticle = WikipediaArticle(
+                pageId = 55L,
+                title = "Albert Einstein",
+                description = "Físico teórico",
+                content = "Texto completo online atualizado.",
+                url = "https://pt.wikipedia.org/wiki/Albert_Einstein"
+            )
+            fakeRepository.exceptionToThrow = null
+            fakeRepository.articleById[55L] = onlineArticle
+
+            viewModel.retry()
+            advanceUntilIdle()
+
+            val recoveredState = viewModel.uiState.value as WikipediaArticleUiState.Success
+            assertFalse(recoveredState.isLocalFallback)
+            assertEquals("Texto completo online atualizado.", recoveredState.article.content)
         } finally {
             Dispatchers.resetMain()
         }

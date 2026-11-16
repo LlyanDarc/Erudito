@@ -24,8 +24,16 @@ class ArticleRepositoryImpl @Inject constructor(
         return articleDao.getArticleById(id)?.toDomain()
     }
 
+    override fun observeArticleById(id: Long): Flow<Article?> {
+        return articleDao.observeArticleById(id).map { it?.toDomain() }
+    }
+
     override suspend fun insertArticle(article: Article): Long {
         return articleDao.insertArticle(article.toEntity())
+    }
+
+    override suspend fun updateArticle(article: Article) {
+        articleDao.updateArticle(article.toEntity())
     }
 
     override suspend fun deleteArticle(id: Long) {

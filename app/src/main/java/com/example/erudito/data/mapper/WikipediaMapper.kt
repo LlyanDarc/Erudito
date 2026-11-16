@@ -63,7 +63,8 @@ fun WikipediaPageDto.toWikipediaArticleOrNull(): WikipediaArticle? {
 }
 
 fun WikipediaArticle.toDomainArticle(
-    lastUpdated: Long = System.currentTimeMillis()
+    lastUpdated: Long = System.currentTimeMillis(),
+    lastSyncedAt: Long? = null
 ): Article {
     return Article(
         id = 0L,
@@ -73,7 +74,19 @@ fun WikipediaArticle.toDomainArticle(
         content = content,
         imageUrl = imageUrl,
         lastUpdated = lastUpdated,
-        wikipediaPageId = pageId
+        wikipediaPageId = pageId,
+        lastSyncedAt = lastSyncedAt
+    )
+}
+
+fun Article.toWikipediaArticle(fallbackPageId: Long = 0L): WikipediaArticle {
+    return WikipediaArticle(
+        pageId = wikipediaPageId ?: fallbackPageId,
+        title = title,
+        description = description,
+        content = content?.takeIf { it.isNotBlank() } ?: description ?: "",
+        imageUrl = imageUrl,
+        url = url
     )
 }
 

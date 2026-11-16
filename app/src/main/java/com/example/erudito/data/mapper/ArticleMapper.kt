@@ -12,7 +12,8 @@ fun ArticleEntity.toDomain(): Article {
         content = content,
         imageUrl = imageUrl,
         lastUpdated = lastUpdated,
-        wikipediaPageId = wikipediaPageId
+        wikipediaPageId = wikipediaPageId,
+        lastSyncedAt = lastSyncedAt
     )
 }
 
@@ -25,6 +26,7 @@ fun Article.toEntity(): ArticleEntity {
         content = content,
         imageUrl = imageUrl,
         lastUpdated = lastUpdated,
-        wikipediaPageId = wikipediaPageId
+        wikipediaPageId = wikipediaPageId,
+        lastSyncedAt = lastSyncedAt
     )
 }

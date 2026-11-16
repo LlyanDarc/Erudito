@@ -207,4 +207,35 @@ class ArticleRepositoryImplTest {
 
         assertEquals(listOf(col1), repository.getCollectionIdsForArticle(articleId).first())
     }
+
+    @Test
+    fun `observeArticleById emits initial article and subsequent updates reactively`() = runTest {
+        val articleId = repository.insertArticle(
+            Article(
+                title = "Marie Curie",
+                url = "https://pt.wikipedia.org/wiki/Marie_Curie",
+                description = "Versão 1",
+                content = "Conteúdo inicial",
+                lastUpdated = 1_000L,
+                wikipediaPageId = 42L
+            )
+        )
+
+        val initial = repository.observeArticleById(articleId).first()
+        assertNotNull(initial)
+        assertEquals("Conteúdo inicial", initial?.content)
+        assertEquals(1_000L, initial?.lastUpdated)
+
+        repository.saveArticleAndAssociateCollections(
+            article = initial!!.copy(
+                content = "Conteúdo atualizado",
+                lastUpdated = 2_000L
+            ),
+            collectionIds = emptyList()
+        )
+
+        val updated = repository.observeArticleById(articleId).first()
+        assertEquals("Conteúdo atualizado", updated?.content)
+        assertEquals(2_000L, updated?.lastUpdated)
+    }
 }

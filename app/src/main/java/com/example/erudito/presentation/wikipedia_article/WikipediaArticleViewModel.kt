@@ -3,6 +3,8 @@ package com.example.erudito.presentation.wikipedia_article
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.erudito.data.mapper.toWikipediaArticle
+import com.example.erudito.domain.connectivity.ConnectivityObserver
 import com.example.erudito.domain.model.Article
 import com.example.erudito.domain.model.WikipediaArticle
 import com.example.erudito.domain.model.WikipediaException
@@ -10,6 +12,7 @@ import com.example.erudito.domain.usecase.AddArticleToCollectionsUseCase
 import com.example.erudito.domain.usecase.CreateCollectionUseCase
 import com.example.erudito.domain.usecase.GetCollectionIdsForArticleUseCase
 import com.example.erudito.domain.usecase.GetCollectionsUseCase
+import com.example.erudito.domain.usecase.GetSavedArticleByWikipediaPageIdUseCase
 import com.example.erudito.domain.usecase.GetSavedArticlesUseCase
 import com.example.erudito.domain.usecase.GetWikipediaArticleUseCase
 import com.example.erudito.domain.usecase.RemoveArticleFromCollectionUseCase
@@ -39,7 +42,9 @@ class WikipediaArticleViewModel @Inject constructor(
     private val saveWikipediaArticleToCollectionsUseCase: SaveWikipediaArticleToCollectionsUseCase,
     private val addArticleToCollectionsUseCase: AddArticleToCollectionsUseCase,
     private val removeArticleFromCollectionUseCase: RemoveArticleFromCollectionUseCase,
-    private val getCollectionIdsForArticleUseCase: GetCollectionIdsForArticleUseCase
+    private val getCollectionIdsForArticleUseCase: GetCollectionIdsForArticleUseCase,
+    private val getSavedArticleByWikipediaPageIdUseCase: GetSavedArticleByWikipediaPageIdUseCase,
+    private val connectivityObserver: ConnectivityObserver
 ) : ViewModel() {
 
     private val hasPageIdArg: Boolean = savedStateHandle.contains(ARG_PAGE_ID)
@@ -57,17 +62,28 @@ class WikipediaArticleViewModel @Inject constructor(
     private val _uiState = MutableStateFlow<WikipediaArticleUiState>(WikipediaArticleUiState.Initial)
     val uiState: StateFlow<WikipediaArticleUiState> = _uiState.asStateFlow()
 
-    private val _collectionsUiState = MutableStateFlow(WikipediaArticleCollectionsUiState())
+    private val _collectionsUiState = MutableStateFlow(
+        WikipediaArticleCollectionsUiState(isOnline = connectivityObserver.isCurrentlyOnline())
+    )
     val collectionsUiState: StateFlow<WikipediaArticleCollectionsUiState> = _collectionsUiState.asStateFlow()
 
     private val _feedbackEvents = Channel<String>(Channel.BUFFERED)
     val feedbackEvents: Flow<String> = _feedbackEvents.receiveAsFlow()
 
     init {
+        observeConnectivity()
         observeAvailableCollections()
         observeSavedArticles()
         if (hasPageIdArg) {
             loadArticle(pageId)
+        }
+    }
+
+    private fun observeConnectivity() {
+        viewModelScope.launch {
+            connectivityObserver.isOnline.collect { online ->
+                _collectionsUiState.update { it.copy(isOnline = online) }
+            }
         }
     }
 
@@ -166,6 +182,22 @@ class WikipediaArticleViewModel @Inject constructor(
         resetArticleAssociationsObservation()
         loadJob = viewModelScope.launch {
             _uiState.value = WikipediaArticleUiState.Loading
+            if (!connectivityObserver.isCurrentlyOnline()) {
+                val localArticle = findSavedLocalArticleByPageId(targetPageId)
+                if (localArticle != null) {
+                    val wikiArticle = localArticle.toWikipediaArticle(fallbackPageId = targetPageId)
+                    _uiState.value = WikipediaArticleUiState.Success(
+                        article = wikiArticle,
+                        isLocalFallback = true,
+                        localLastUpdated = localArticle.lastUpdated
+                    )
+                    observeCollectionAssociationsForArticle(wikiArticle)
+                } else {
+                    _uiState.value = WikipediaArticleUiState.Error(NO_CONNECTION_MESSAGE)
+                }
+                return@launch
+            }
+
             try {
                 val article = getWikipediaArticleUseCase(targetPageId)
                 if (article != null) {
@@ -177,7 +209,18 @@ class WikipediaArticleViewModel @Inject constructor(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: WikipediaException) {
-                _uiState.value = WikipediaArticleUiState.Error(e.message)
+                val localArticle = findSavedLocalArticleByPageId(targetPageId)
+                if (localArticle != null) {
+                    val wikiArticle = localArticle.toWikipediaArticle(fallbackPageId = targetPageId)
+                    _uiState.value = WikipediaArticleUiState.Success(
+                        article = wikiArticle,
+                        isLocalFallback = true,
+                        localLastUpdated = localArticle.lastUpdated
+                    )
+                    observeCollectionAssociationsForArticle(wikiArticle)
+                } else {
+                    _uiState.value = WikipediaArticleUiState.Error(e.message)
+                }
             } catch (e: IllegalArgumentException) {
                 _uiState.value = WikipediaArticleUiState.Error(
                     e.message ?: INVALID_PAGE_ID_MESSAGE
@@ -188,6 +231,12 @@ class WikipediaArticleViewModel @Inject constructor(
                 )
             }
         }
+    }
+
+    private suspend fun findSavedLocalArticleByPageId(targetPageId: Long): Article? {
+        return runCatching {
+            getSavedArticleByWikipediaPageIdUseCase(targetPageId)
+        }.getOrNull() ?: cachedSavedArticles.find { it.wikipediaPageId == targetPageId }
     }
 
     fun retry() {
@@ -367,6 +416,8 @@ class WikipediaArticleViewModel @Inject constructor(
         const val ARG_PAGE_ID = "pageId"
         private const val INVALID_PAGE_ID_MESSAGE = "Identificador de artigo inválido."
         private const val ARTICLE_NOT_FOUND_MESSAGE = "Artigo não encontrado na Wikipédia."
+        private const val NO_CONNECTION_MESSAGE =
+            "Sem conexão com a internet. Verifique sua rede e tente novamente."
         private const val GENERIC_ERROR_MESSAGE =
             "Não foi possível carregar o artigo da Wikipédia. Tente novamente."
         private const val EMPTY_SELECTION_ERROR_MESSAGE =

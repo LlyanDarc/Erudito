@@ -5,6 +5,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
+import com.example.erudito.domain.connectivity.FakeConnectivityObserver
 import com.example.erudito.domain.model.WikipediaArticle
 import com.example.erudito.domain.model.WikipediaException
 import com.example.erudito.domain.model.WikipediaSearchResult
@@ -209,7 +210,10 @@ class SearchScreenTest {
                     )
                 )
             )
-            val viewModel = SearchViewModel(SearchWikipediaArticlesUseCase(fakeRepo))
+            val viewModel = SearchViewModel(
+                searchWikipediaArticlesUseCase = SearchWikipediaArticlesUseCase(fakeRepo),
+                connectivityObserver = FakeConnectivityObserver()
+            )
             var clickedPageId: Long? = null
 
             composeTestRule.setContent {
@@ -247,6 +251,38 @@ class SearchScreenTest {
             composeTestRule.onNodeWithTag("search_clear_button").performClick()
             composeTestRule.waitForIdle()
             composeTestRule.onNodeWithTag("search_initial_state").assertExists()
+        } finally {
+            Dispatchers.resetMain()
+        }
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun `SearchScreen displays offline banner when disconnected and hides it when back online`() {
+        val dispatcher = UnconfinedTestDispatcher()
+        Dispatchers.setMain(dispatcher)
+        try {
+            val connectivityObserver = FakeConnectivityObserver(initialOnline = false)
+            val fakeRepo = FakeUiWikipediaRepository()
+            val viewModel = SearchViewModel(
+                searchWikipediaArticlesUseCase = SearchWikipediaArticlesUseCase(fakeRepo),
+                connectivityObserver = connectivityObserver
+            )
+
+            composeTestRule.setContent {
+                SearchScreen(
+                    viewModel = viewModel,
+                    onNavigateBack = {},
+                    onArticleSelected = {}
+                )
+            }
+
+            composeTestRule.waitForIdle()
+            composeTestRule.onNodeWithTag("search_offline_banner").assertExists()
+
+            connectivityObserver.setOnline(true)
+            composeTestRule.waitForIdle()
+            composeTestRule.onNodeWithTag("search_offline_banner").assertDoesNotExist()
         } finally {
             Dispatchers.resetMain()
         }

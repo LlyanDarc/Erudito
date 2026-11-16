@@ -14,6 +14,8 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import androidx.lifecycle.SavedStateHandle
+import com.example.erudito.domain.connectivity.ConnectivityObserver
+import com.example.erudito.domain.connectivity.FakeConnectivityObserver
 import com.example.erudito.domain.model.Article
 import com.example.erudito.domain.model.WikipediaArticle
 import com.example.erudito.domain.model.WikipediaException
@@ -26,6 +28,7 @@ import com.example.erudito.domain.usecase.AddArticleToCollectionsUseCase
 import com.example.erudito.domain.usecase.CreateCollectionUseCase
 import com.example.erudito.domain.usecase.GetCollectionIdsForArticleUseCase
 import com.example.erudito.domain.usecase.GetCollectionsUseCase
+import com.example.erudito.domain.usecase.GetSavedArticleByWikipediaPageIdUseCase
 import com.example.erudito.domain.usecase.GetSavedArticlesUseCase
 import com.example.erudito.domain.usecase.GetWikipediaArticleUseCase
 import com.example.erudito.domain.usecase.RemoveArticleFromCollectionUseCase
@@ -56,7 +59,8 @@ class WikipediaArticleScreenTest {
         savedStateHandle: SavedStateHandle,
         wikipediaRepo: WikipediaRepository,
         collectionRepo: FakeCollectionRepository = FakeCollectionRepository(),
-        articleRepo: ArticleRepository = FakeArticleRepository()
+        articleRepo: ArticleRepository = FakeArticleRepository(),
+        connectivityObserver: ConnectivityObserver = FakeConnectivityObserver(initialOnline = true)
     ): WikipediaArticleViewModel {
         return WikipediaArticleViewModel(
             savedStateHandle = savedStateHandle,
@@ -73,7 +77,9 @@ class WikipediaArticleScreenTest {
                 collectionRepository = collectionRepo
             ),
             removeArticleFromCollectionUseCase = RemoveArticleFromCollectionUseCase(articleRepo),
-            getCollectionIdsForArticleUseCase = GetCollectionIdsForArticleUseCase(articleRepo)
+            getCollectionIdsForArticleUseCase = GetCollectionIdsForArticleUseCase(articleRepo),
+            getSavedArticleByWikipediaPageIdUseCase = GetSavedArticleByWikipediaPageIdUseCase(articleRepo),
+            connectivityObserver = connectivityObserver
         )
     }
 
@@ -418,6 +424,106 @@ class WikipediaArticleScreenTest {
         } finally {
             Dispatchers.resetMain()
         }
+    }
+
+    @Test
+    fun `WikipediaArticleScreen displays local fallback banner and hides reload button when offline`() {
+        val article = WikipediaArticle(
+            pageId = 42L,
+            title = "Sócrates",
+            content = "Conteúdo salvo localmente.",
+            url = "https://pt.wikipedia.org/wiki/S%C3%B3crates"
+        )
+
+        composeTestRule.setContent {
+            WikipediaArticleScreenContent(
+                uiState = WikipediaArticleUiState.Success(
+                    article = article,
+                    isLocalFallback = true,
+                    localLastUpdated = 1_700_000_000_000L
+                ),
+                onNavigateBack = {},
+                onRetry = {},
+                onOpenOriginalUrl = {},
+                collectionsUiState = WikipediaArticleCollectionsUiState(
+                    savedCollectionIds = setOf(1L),
+                    isLoadingCollections = false,
+                    isOnline = false
+                )
+            )
+        }
+
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithText("Leitura Local (Offline)").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("wikipedia_article_source_badge").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Cópia Local Offline").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("wikipedia_article_offline_fallback_banner").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("wikipedia_article_reload_online_button").assertDoesNotExist()
+    }
+
+    @Test
+    fun `WikipediaArticleScreen shows reload online button in fallback banner when online and triggers retry`() {
+        var retried = false
+        val article = WikipediaArticle(
+            pageId = 42L,
+            title = "Sócrates",
+            content = "Conteúdo salvo localmente.",
+            url = "https://pt.wikipedia.org/wiki/S%C3%B3crates"
+        )
+
+        composeTestRule.setContent {
+            WikipediaArticleScreenContent(
+                uiState = WikipediaArticleUiState.Success(
+                    article = article,
+                    isLocalFallback = true,
+                    localLastUpdated = 1_700_000_000_000L
+                ),
+                onNavigateBack = {},
+                onRetry = { retried = true },
+                onOpenOriginalUrl = {},
+                collectionsUiState = WikipediaArticleCollectionsUiState(
+                    savedCollectionIds = setOf(1L),
+                    isLoadingCollections = false,
+                    isOnline = true
+                )
+            )
+        }
+
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("wikipedia_article_reload_online_button")
+            .assertIsDisplayed()
+            .performClick()
+        assertTrue(retried)
+    }
+
+    @Test
+    fun `WikipediaArticleScreen shows offline chip during online reading when connection drops`() {
+        val article = WikipediaArticle(
+            pageId = 42L,
+            title = "Sócrates",
+            content = "Conteúdo carregado online.",
+            url = "https://pt.wikipedia.org/wiki/S%C3%B3crates"
+        )
+
+        composeTestRule.setContent {
+            WikipediaArticleScreenContent(
+                uiState = WikipediaArticleUiState.Success(
+                    article = article,
+                    isLocalFallback = false
+                ),
+                onNavigateBack = {},
+                onRetry = {},
+                onOpenOriginalUrl = {},
+                collectionsUiState = WikipediaArticleCollectionsUiState(
+                    isLoadingCollections = false,
+                    isOnline = false
+                )
+            )
+        }
+
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("wikipedia_article_connectivity_badge").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Sem conexão").assertIsDisplayed()
     }
 
     private class FakeScreenWikipediaRepository(

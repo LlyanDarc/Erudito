@@ -8,5 +8,6 @@ data class Article(
     val content: String? = null,
     val imageUrl: String? = null,
     val lastUpdated: Long = System.currentTimeMillis(),
-    val wikipediaPageId: Long? = null
+    val wikipediaPageId: Long? = null,
+    val lastSyncedAt: Long? = null
 )

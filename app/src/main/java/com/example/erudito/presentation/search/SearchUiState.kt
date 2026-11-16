@@ -16,7 +16,8 @@ data class SearchUiState(
     val hasSearched: Boolean = false,
     val lastSearchedQuery: String = "",
     val results: List<WikipediaSearchResult> = emptyList(),
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
+    val isOnline: Boolean = true
 ) {
     val contentState: SearchContentState
         get() = when {

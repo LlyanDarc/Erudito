@@ -6,7 +6,9 @@ import kotlinx.coroutines.flow.Flow
 interface ArticleRepository {
     fun getSavedArticles(): Flow<List<Article>>
     suspend fun getArticleById(id: Long): Article?
+    fun observeArticleById(id: Long): Flow<Article?>
     suspend fun insertArticle(article: Article): Long
+    suspend fun updateArticle(article: Article)
     suspend fun deleteArticle(id: Long)
     suspend fun addArticleToCollection(articleId: Long, collectionId: Long)
     suspend fun removeArticleFromCollection(articleId: Long, collectionId: Long)

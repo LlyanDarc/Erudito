@@ -31,6 +31,8 @@ import com.example.erudito.data.local.entity.CollectionArticleCrossRef
 import com.example.erudito.data.local.entity.CollectionEntity
 import com.example.erudito.data.repository.ArticleRepositoryImpl
 import com.example.erudito.data.repository.CollectionRepositoryImpl
+import com.example.erudito.domain.connectivity.ConnectivityObserver
+import com.example.erudito.domain.connectivity.FakeConnectivityObserver
 import com.example.erudito.domain.model.WikipediaArticle
 import com.example.erudito.domain.model.WikipediaSearchResult
 import com.example.erudito.domain.repository.ArticleRepository
@@ -39,12 +41,13 @@ import com.example.erudito.domain.repository.WikipediaRepository
 import com.example.erudito.domain.usecase.AddArticleToCollectionsUseCase
 import com.example.erudito.domain.usecase.CreateCollectionUseCase
 import com.example.erudito.domain.usecase.DeleteCollectionUseCase
-import com.example.erudito.domain.usecase.GetArticleByIdUseCase
 import com.example.erudito.domain.usecase.GetCollectionIdsForArticleUseCase
 import com.example.erudito.domain.usecase.GetCollectionWithArticlesUseCase
 import com.example.erudito.domain.usecase.GetCollectionsUseCase
+import com.example.erudito.domain.usecase.GetSavedArticleByWikipediaPageIdUseCase
 import com.example.erudito.domain.usecase.GetSavedArticlesUseCase
 import com.example.erudito.domain.usecase.GetWikipediaArticleUseCase
+import com.example.erudito.domain.usecase.ObserveArticleByIdUseCase
 import com.example.erudito.domain.usecase.RemoveArticleFromCollectionUseCase
 import com.example.erudito.domain.usecase.RenameCollectionUseCase
 import com.example.erudito.domain.usecase.SaveWikipediaArticleToCollectionsUseCase
@@ -462,7 +465,8 @@ class Bundle3EndToEndIntegrationTest {
     @Composable
     private fun RealDbEruditoNavHost(
         navController: NavHostController,
-        wikipediaRepo: WikipediaRepository
+        wikipediaRepo: WikipediaRepository,
+        connectivityObserver: ConnectivityObserver = FakeConnectivityObserver(initialOnline = true)
     ) {
         EruditoNavHost(
             navController = navController,
@@ -473,7 +477,8 @@ class Bundle3EndToEndIntegrationTest {
                         getSavedArticlesUseCase = GetSavedArticlesUseCase(articleRepository),
                         createCollectionUseCase = CreateCollectionUseCase(collectionRepository),
                         renameCollectionUseCase = RenameCollectionUseCase(collectionRepository),
-                        deleteCollectionUseCase = DeleteCollectionUseCase(collectionRepository)
+                        deleteCollectionUseCase = DeleteCollectionUseCase(collectionRepository),
+                        connectivityObserver = connectivityObserver
                     )
                 }
             },
@@ -502,7 +507,7 @@ class Bundle3EndToEndIntegrationTest {
                 navViewModel(backStackEntry) { savedStateHandle ->
                     ArticleDetailViewModel(
                         savedStateHandle = savedStateHandle,
-                        getArticleByIdUseCase = GetArticleByIdUseCase(articleRepository),
+                        observeArticleByIdUseCase = ObserveArticleByIdUseCase(articleRepository),
                         getCollectionsUseCase = GetCollectionsUseCase(collectionRepository),
                         createCollectionUseCase = CreateCollectionUseCase(collectionRepository),
                         addArticleToCollectionsUseCase = AddArticleToCollectionsUseCase(
@@ -510,14 +515,16 @@ class Bundle3EndToEndIntegrationTest {
                             collectionRepository = collectionRepository
                         ),
                         removeArticleFromCollectionUseCase = RemoveArticleFromCollectionUseCase(articleRepository),
-                        getCollectionIdsForArticleUseCase = GetCollectionIdsForArticleUseCase(articleRepository)
+                        getCollectionIdsForArticleUseCase = GetCollectionIdsForArticleUseCase(articleRepository),
+                        connectivityObserver = connectivityObserver
                     )
                 }
             },
             searchViewModelProvider = { backStackEntry ->
                 navViewModel(backStackEntry) {
                     SearchViewModel(
-                        searchWikipediaArticlesUseCase = SearchWikipediaArticlesUseCase(wikipediaRepo)
+                        searchWikipediaArticlesUseCase = SearchWikipediaArticlesUseCase(wikipediaRepo),
+                        connectivityObserver = connectivityObserver
                     )
                 }
             },
@@ -538,7 +545,9 @@ class Bundle3EndToEndIntegrationTest {
                             collectionRepository = collectionRepository
                         ),
                         removeArticleFromCollectionUseCase = RemoveArticleFromCollectionUseCase(articleRepository),
-                        getCollectionIdsForArticleUseCase = GetCollectionIdsForArticleUseCase(articleRepository)
+                        getCollectionIdsForArticleUseCase = GetCollectionIdsForArticleUseCase(articleRepository),
+                        getSavedArticleByWikipediaPageIdUseCase = GetSavedArticleByWikipediaPageIdUseCase(articleRepository),
+                        connectivityObserver = connectivityObserver
                     )
                 }
             }

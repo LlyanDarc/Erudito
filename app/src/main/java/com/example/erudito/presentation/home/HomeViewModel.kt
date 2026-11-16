@@ -2,6 +2,7 @@ package com.example.erudito.presentation.home
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.erudito.domain.connectivity.ConnectivityObserver
 import com.example.erudito.domain.usecase.CreateCollectionUseCase
 import com.example.erudito.domain.usecase.DeleteCollectionUseCase
 import com.example.erudito.domain.usecase.GetCollectionsUseCase
@@ -26,17 +27,29 @@ class HomeViewModel @Inject constructor(
     private val getSavedArticlesUseCase: GetSavedArticlesUseCase,
     private val createCollectionUseCase: CreateCollectionUseCase,
     private val renameCollectionUseCase: RenameCollectionUseCase,
-    private val deleteCollectionUseCase: DeleteCollectionUseCase
+    private val deleteCollectionUseCase: DeleteCollectionUseCase,
+    private val connectivityObserver: ConnectivityObserver
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow(HomeUiState())
+    private val _uiState = MutableStateFlow(
+        HomeUiState(isOnline = connectivityObserver.isCurrentlyOnline())
+    )
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
 
     private val _feedbackEvents = Channel<String>(Channel.BUFFERED)
     val feedbackEvents: Flow<String> = _feedbackEvents.receiveAsFlow()
 
     init {
+        observeConnectivity()
         loadLibraryData()
+    }
+
+    private fun observeConnectivity() {
+        viewModelScope.launch {
+            connectivityObserver.isOnline.collect { online ->
+                _uiState.update { it.copy(isOnline = online) }
+            }
+        }
     }
 
     private fun loadLibraryData() {

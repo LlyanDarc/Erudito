@@ -14,7 +14,8 @@ data class ArticleDetailUiState(
     val isLoadingCollections: Boolean = true,
     val isSavingCollections: Boolean = false,
     val isCreatingCollection: Boolean = false,
-    val pickerErrorMessage: String? = null
+    val pickerErrorMessage: String? = null,
+    val isOnline: Boolean = true
 ) {
     val isSavedInAnyCollection: Boolean get() = savedCollectionIds.isNotEmpty()
     val savedCollectionsCount: Int get() = savedCollectionIds.size

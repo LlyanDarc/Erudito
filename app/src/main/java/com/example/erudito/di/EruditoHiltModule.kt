@@ -2,6 +2,7 @@ package com.example.erudito.di
 
 import android.content.Context
 import com.example.BuildConfig
+import com.example.erudito.data.connectivity.AndroidConnectivityObserver
 import com.example.erudito.data.local.dao.ArticleDao
 import com.example.erudito.data.local.dao.CollectionDao
 import com.example.erudito.data.local.database.EruditoDatabase
@@ -9,9 +10,11 @@ import com.example.erudito.data.remote.api.WikipediaApiService
 import com.example.erudito.data.repository.ArticleRepositoryImpl
 import com.example.erudito.data.repository.CollectionRepositoryImpl
 import com.example.erudito.data.repository.WikipediaRepositoryImpl
+import com.example.erudito.domain.connectivity.ConnectivityObserver
 import com.example.erudito.domain.repository.ArticleRepository
 import com.example.erudito.domain.repository.CollectionRepository
 import com.example.erudito.domain.repository.WikipediaRepository
+import com.example.erudito.domain.sync.SyncPolicy
 import com.example.erudito.domain.usecase.AddArticleToCollectionsUseCase
 import com.example.erudito.domain.usecase.CreateCollectionUseCase
 import com.example.erudito.domain.usecase.DeleteCollectionUseCase
@@ -19,12 +22,16 @@ import com.example.erudito.domain.usecase.GetArticleByIdUseCase
 import com.example.erudito.domain.usecase.GetCollectionIdsForArticleUseCase
 import com.example.erudito.domain.usecase.GetCollectionWithArticlesUseCase
 import com.example.erudito.domain.usecase.GetCollectionsUseCase
+import com.example.erudito.domain.usecase.GetSavedArticleByWikipediaPageIdUseCase
 import com.example.erudito.domain.usecase.GetSavedArticlesUseCase
 import com.example.erudito.domain.usecase.GetWikipediaArticleUseCase
+import com.example.erudito.domain.usecase.ObserveArticleByIdUseCase
+import com.example.erudito.domain.usecase.RefreshSavedArticleUseCase
 import com.example.erudito.domain.usecase.RemoveArticleFromCollectionUseCase
 import com.example.erudito.domain.usecase.RenameCollectionUseCase
 import com.example.erudito.domain.usecase.SaveWikipediaArticleToCollectionsUseCase
 import com.example.erudito.domain.usecase.SearchWikipediaArticlesUseCase
+import com.example.erudito.domain.usecase.SyncSavedArticlesUseCase
 import com.squareup.moshi.Moshi
 import dagger.Module
 import dagger.Provides
@@ -163,8 +170,28 @@ object EruditoHiltModule {
     }
 
     @Provides
+    @Singleton
+    fun provideConnectivityObserver(
+        @ApplicationContext context: Context
+    ): ConnectivityObserver {
+        return AndroidConnectivityObserver(context)
+    }
+
+    @Provides
     fun provideGetArticleByIdUseCase(repository: ArticleRepository): GetArticleByIdUseCase {
         return GetArticleByIdUseCase(repository)
+    }
+
+    @Provides
+    fun provideObserveArticleByIdUseCase(repository: ArticleRepository): ObserveArticleByIdUseCase {
+        return ObserveArticleByIdUseCase(repository)
+    }
+
+    @Provides
+    fun provideGetSavedArticleByWikipediaPageIdUseCase(
+        repository: ArticleRepository
+    ): GetSavedArticleByWikipediaPageIdUseCase {
+        return GetSavedArticleByWikipediaPageIdUseCase(repository)
     }
 
     @Provides
@@ -217,5 +244,39 @@ object EruditoHiltModule {
         articleRepository: ArticleRepository
     ): GetCollectionIdsForArticleUseCase {
         return GetCollectionIdsForArticleUseCase(articleRepository)
+    }
+
+    @Provides
+    @Singleton
+    fun provideSyncPolicy(): SyncPolicy {
+        return SyncPolicy()
+    }
+
+    @Provides
+    fun provideRefreshSavedArticleUseCase(
+        articleRepository: ArticleRepository,
+        wikipediaRepository: WikipediaRepository,
+        connectivityObserver: ConnectivityObserver,
+        syncPolicy: SyncPolicy
+    ): RefreshSavedArticleUseCase {
+        return RefreshSavedArticleUseCase(
+            articleRepository = articleRepository,
+            wikipediaRepository = wikipediaRepository,
+            connectivityObserver = connectivityObserver,
+            syncPolicy = syncPolicy
+        )
+    }
+
+    @Provides
+    fun provideSyncSavedArticlesUseCase(
+        articleRepository: ArticleRepository,
+        refreshSavedArticleUseCase: RefreshSavedArticleUseCase,
+        connectivityObserver: ConnectivityObserver
+    ): SyncSavedArticlesUseCase {
+        return SyncSavedArticlesUseCase(
+            articleRepository = articleRepository,
+            refreshSavedArticleUseCase = refreshSavedArticleUseCase,
+            connectivityObserver = connectivityObserver
+        )
     }
 }

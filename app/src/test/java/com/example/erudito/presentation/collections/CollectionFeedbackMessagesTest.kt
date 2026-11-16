@@ -9,6 +9,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToIndex
+import com.example.erudito.domain.connectivity.FakeConnectivityObserver
 import com.example.erudito.domain.repository.FakeArticleRepository
 import com.example.erudito.domain.repository.FakeCollectionRepository
 import com.example.erudito.domain.usecase.CreateCollectionUseCase
@@ -53,7 +54,8 @@ class CollectionFeedbackMessagesTest {
                 getSavedArticlesUseCase = GetSavedArticlesUseCase(articleRepo),
                 createCollectionUseCase = CreateCollectionUseCase(collectionRepo),
                 renameCollectionUseCase = RenameCollectionUseCase(collectionRepo),
-                deleteCollectionUseCase = DeleteCollectionUseCase(collectionRepo)
+                deleteCollectionUseCase = DeleteCollectionUseCase(collectionRepo),
+                connectivityObserver = FakeConnectivityObserver()
             )
 
             val events = mutableListOf<String>()
@@ -198,7 +200,8 @@ class CollectionFeedbackMessagesTest {
                 getSavedArticlesUseCase = GetSavedArticlesUseCase(articleRepo),
                 createCollectionUseCase = CreateCollectionUseCase(collectionRepo),
                 renameCollectionUseCase = RenameCollectionUseCase(collectionRepo),
-                deleteCollectionUseCase = DeleteCollectionUseCase(collectionRepo)
+                deleteCollectionUseCase = DeleteCollectionUseCase(collectionRepo),
+                connectivityObserver = FakeConnectivityObserver()
             )
 
             composeTestRule.setContent {
@@ -248,7 +251,8 @@ class CollectionFeedbackMessagesTest {
                 getSavedArticlesUseCase = GetSavedArticlesUseCase(articleRepo),
                 createCollectionUseCase = CreateCollectionUseCase(collectionRepo),
                 renameCollectionUseCase = RenameCollectionUseCase(collectionRepo),
-                deleteCollectionUseCase = DeleteCollectionUseCase(collectionRepo)
+                deleteCollectionUseCase = DeleteCollectionUseCase(collectionRepo),
+                connectivityObserver = FakeConnectivityObserver()
             )
 
             composeTestRule.setContent {

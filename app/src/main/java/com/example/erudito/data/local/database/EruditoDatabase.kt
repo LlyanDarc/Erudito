@@ -24,7 +24,7 @@ import kotlinx.coroutines.launch
         ArticleEntity::class,
         CollectionArticleCrossRef::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = false
 )
 abstract class EruditoDatabase : RoomDatabase() {
@@ -59,6 +59,12 @@ abstract class EruditoDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_2_3: Migration = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE articles ADD COLUMN lastSyncedAt INTEGER")
+            }
+        }
+
         fun getInstance(context: Context): EruditoDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -66,7 +72,7 @@ abstract class EruditoDatabase : RoomDatabase() {
                     EruditoDatabase::class.java,
                     "erudito_database.db"
                 )
-                    .addMigrations(MIGRATION_1_2)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                     .addCallback(DatabaseCallback())
                     .build()
                 INSTANCE = instance

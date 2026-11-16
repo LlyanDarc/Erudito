@@ -2,6 +2,7 @@ package com.example.erudito.presentation.home
 
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
+import com.example.erudito.domain.connectivity.FakeConnectivityObserver
 import com.example.erudito.domain.repository.FakeArticleRepository
 import com.example.erudito.domain.repository.FakeCollectionRepository
 import com.example.erudito.domain.usecase.CreateCollectionUseCase
@@ -73,7 +74,8 @@ class HomeErrorHandlingTest {
                 getSavedArticlesUseCase = GetSavedArticlesUseCase(articleRepo),
                 createCollectionUseCase = CreateCollectionUseCase(collectionRepo),
                 renameCollectionUseCase = RenameCollectionUseCase(collectionRepo),
-                deleteCollectionUseCase = DeleteCollectionUseCase(collectionRepo)
+                deleteCollectionUseCase = DeleteCollectionUseCase(collectionRepo),
+                connectivityObserver = FakeConnectivityObserver()
             )
 
             // Dispara erro de validação RN01 pelo ViewModel

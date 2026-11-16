@@ -1,15 +1,16 @@
 package com.example.erudito.presentation.article_detail
 
 import androidx.lifecycle.SavedStateHandle
+import com.example.erudito.domain.connectivity.FakeConnectivityObserver
 import com.example.erudito.domain.model.Article
 import com.example.erudito.domain.repository.ArticleRepository
 import com.example.erudito.domain.repository.FakeArticleRepository
 import com.example.erudito.domain.repository.FakeCollectionRepository
 import com.example.erudito.domain.usecase.AddArticleToCollectionsUseCase
 import com.example.erudito.domain.usecase.CreateCollectionUseCase
-import com.example.erudito.domain.usecase.GetArticleByIdUseCase
 import com.example.erudito.domain.usecase.GetCollectionIdsForArticleUseCase
 import com.example.erudito.domain.usecase.GetCollectionsUseCase
+import com.example.erudito.domain.usecase.ObserveArticleByIdUseCase
 import com.example.erudito.domain.usecase.RemoveArticleFromCollectionUseCase
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
@@ -45,11 +46,12 @@ class ArticleDetailViewModelTest {
     private fun createViewModel(
         articleId: Long,
         articleRepo: ArticleRepository = fakeArticleRepository,
-        collectionRepo: FakeCollectionRepository = fakeCollectionRepository
+        collectionRepo: FakeCollectionRepository = fakeCollectionRepository,
+        connectivityObserver: FakeConnectivityObserver = FakeConnectivityObserver()
     ): ArticleDetailViewModel {
         return ArticleDetailViewModel(
             savedStateHandle = SavedStateHandle(mapOf("articleId" to articleId)),
-            getArticleByIdUseCase = GetArticleByIdUseCase(articleRepo),
+            observeArticleByIdUseCase = ObserveArticleByIdUseCase(articleRepo),
             getCollectionsUseCase = GetCollectionsUseCase(collectionRepo),
             createCollectionUseCase = CreateCollectionUseCase(collectionRepo),
             addArticleToCollectionsUseCase = AddArticleToCollectionsUseCase(
@@ -57,7 +59,8 @@ class ArticleDetailViewModelTest {
                 collectionRepository = collectionRepo
             ),
             removeArticleFromCollectionUseCase = RemoveArticleFromCollectionUseCase(articleRepo),
-            getCollectionIdsForArticleUseCase = GetCollectionIdsForArticleUseCase(articleRepo)
+            getCollectionIdsForArticleUseCase = GetCollectionIdsForArticleUseCase(articleRepo),
+            connectivityObserver = connectivityObserver
         )
     }
 
@@ -324,6 +327,56 @@ class ArticleDetailViewModelTest {
             assertEquals("Erro simulado ao associar", viewModel.uiState.value.pickerErrorMessage)
             assertEquals("Erro simulado ao associar", feedback.last())
             job.cancel()
+        } finally {
+            Dispatchers.resetMain()
+        }
+    }
+
+    @Test
+    fun `reactively reflects external updates to saved article content and connectivity state`() = runTest {
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        Dispatchers.setMain(dispatcher)
+        try {
+            val connectivityObserver = FakeConnectivityObserver(initialOnline = false)
+            val col1 = fakeCollectionRepository.createCollection("Filosofia")
+            val articleId = fakeArticleRepository.saveArticleAndAssociateCollections(
+                Article(
+                    title = "Sócrates",
+                    description = "Versão inicial",
+                    content = "Conteúdo inicial",
+                    url = "https://pt.wikipedia.org/wiki/S%C3%B3crates",
+                    wikipediaPageId = 42L
+                ),
+                listOf(col1)
+            )
+
+            val viewModel = createViewModel(
+                articleId = articleId,
+                connectivityObserver = connectivityObserver
+            )
+            advanceUntilIdle()
+
+            assertFalse(viewModel.uiState.value.isOnline)
+            assertEquals("Conteúdo inicial", viewModel.uiState.value.article?.content)
+
+            // Atualização externa do artigo no repositório deve refletir imediatamente na tela
+            fakeArticleRepository.insertArticle(
+                Article(
+                    id = articleId,
+                    title = "Sócrates",
+                    description = "Filósofo clássico ateniense",
+                    content = "Conteúdo atualizado sincronizado",
+                    url = "https://pt.wikipedia.org/wiki/S%C3%B3crates",
+                    wikipediaPageId = 42L
+                )
+            )
+            connectivityObserver.setOnline(true)
+            advanceUntilIdle()
+
+            assertTrue(viewModel.uiState.value.isOnline)
+            assertEquals("Filósofo clássico ateniense", viewModel.uiState.value.article?.description)
+            assertEquals("Conteúdo atualizado sincronizado", viewModel.uiState.value.article?.content)
+            assertEquals(setOf(col1), viewModel.uiState.value.savedCollectionIds)
         } finally {
             Dispatchers.resetMain()
         }

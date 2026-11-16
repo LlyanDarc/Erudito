@@ -19,6 +19,10 @@ class FakeArticleRepository(
         return articles.find { it.id == id }
     }
 
+    override fun observeArticleById(id: Long): Flow<Article?> {
+        return articlesFlow.map { list -> list.find { it.id == id } }
+    }
+
     override suspend fun insertArticle(article: Article): Long {
         val newId = if (article.id != 0L) article.id else (articles.maxOfOrNull { it.id } ?: 0L) + 1L
         val saved = article.copy(id = newId)
@@ -30,6 +34,14 @@ class FakeArticleRepository(
         }
         articlesFlow.value = articles.toList()
         return newId
+    }
+
+    override suspend fun updateArticle(article: Article) {
+        val existingIdx = articles.indexOfFirst { it.id == article.id }
+        if (existingIdx >= 0) {
+            articles[existingIdx] = article
+            articlesFlow.value = articles.toList()
+        }
     }
 
     override suspend fun deleteArticle(id: Long) {
@@ -114,7 +126,8 @@ class FakeArticleRepository(
             val idx = articles.indexOfFirst { it.id == existing.id }
             articles[idx] = article.copy(
                 id = existing.id,
-                wikipediaPageId = article.wikipediaPageId ?: existing.wikipediaPageId
+                wikipediaPageId = article.wikipediaPageId ?: existing.wikipediaPageId,
+                lastSyncedAt = article.lastSyncedAt ?: existing.lastSyncedAt
             )
             articlesFlow.value = articles.toList()
             existing.id

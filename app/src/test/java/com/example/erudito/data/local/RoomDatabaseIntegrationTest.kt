@@ -313,9 +313,9 @@ class RoomDatabaseIntegrationTest {
         v1Helper.writableDatabase.close()
         v1Helper.close()
 
-        // 2. Abre com Room v2 executando MIGRATION_1_2 e validação de schema
+        // 2. Abre com Room v3 executando MIGRATION_1_2 + MIGRATION_2_3 e validação de schema
         val migratedDb = Room.databaseBuilder(context, EruditoDatabase::class.java, dbName)
-            .addMigrations(EruditoDatabase.MIGRATION_1_2)
+            .addMigrations(EruditoDatabase.MIGRATION_1_2, EruditoDatabase.MIGRATION_2_3)
             .allowMainThreadQueries()
             .build()
 
@@ -331,6 +331,7 @@ class RoomDatabaseIntegrationTest {
             val articles = migratedArticleDao.getAllArticles().first()
             assertEquals(2, articles.size)
             assertTrue(articles.all { it.wikipediaPageId == null })
+            assertTrue(articles.all { it.lastSyncedAt == null })
 
             val colIdsArt11 = migratedArticleDao.getCollectionIdsForArticle(11L).first().toSet()
             assertEquals(setOf(1L, 2L), colIdsArt11)
@@ -603,5 +604,168 @@ class RoomDatabaseIntegrationTest {
         assertEquals(0, articleDao.getArticleCount())
         assertNull(articleDao.getArticleByWikipediaPageId(5555L))
         assertTrue(articleDao.getArticlesForCollection(validColId).first().isEmpty())
+    }
+
+    @Test
+    fun migration2To3PreservesAllDataAndSetsLastSyncedAtToNull() = runTest {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val dbName = "migration_2_3_test_${System.nanoTime()}.db"
+        context.deleteDatabase(dbName)
+
+        val v2Helper = object : SQLiteOpenHelper(context, dbName, null, 2) {
+            override fun onCreate(db: SQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `collections` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `name` TEXT NOT NULL,
+                        `createdAt` INTEGER NOT NULL
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `articles` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `title` TEXT NOT NULL,
+                        `url` TEXT NOT NULL,
+                        `description` TEXT,
+                        `content` TEXT,
+                        `imageUrl` TEXT,
+                        `lastUpdated` INTEGER NOT NULL,
+                        `wikipediaPageId` INTEGER
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS `index_articles_wikipediaPageId` ON `articles` (`wikipediaPageId`)"
+                )
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `collection_article_cross_ref` (
+                        `collectionId` INTEGER NOT NULL,
+                        `articleId` INTEGER NOT NULL,
+                        PRIMARY KEY(`collectionId`, `articleId`),
+                        FOREIGN KEY(`collectionId`) REFERENCES `collections`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE,
+                        FOREIGN KEY(`articleId`) REFERENCES `articles`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_collection_article_cross_ref_collectionId` ON `collection_article_cross_ref` (`collectionId`)"
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_collection_article_cross_ref_articleId` ON `collection_article_cross_ref` (`articleId`)"
+                )
+
+                db.execSQL("INSERT INTO collections (id, name, createdAt) VALUES (1, 'Física', 1000)")
+                db.execSQL("INSERT INTO collections (id, name, createdAt) VALUES (2, 'Filosofia', 2000)")
+                db.execSQL(
+                    """
+                    INSERT INTO articles (id, title, url, description, content, imageUrl, lastUpdated, wikipediaPageId)
+                    VALUES (10, 'Filosofia Grega', 'https://pt.wikipedia.org/wiki/Filosofia_grega', 'Curadoria', 'Texto curado', NULL, 3000, NULL)
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    """
+                    INSERT INTO articles (id, title, url, description, content, imageUrl, lastUpdated, wikipediaPageId)
+                    VALUES (20, 'Mecânica Quântica', 'https://pt.wikipedia.org/wiki/Mec%C3%A2nica_qu%C3%A2ntica', 'Física moderna', 'Texto quântico', 'https://upload.wikimedia.org/q.jpg', 4000, 9988)
+                    """.trimIndent()
+                )
+                db.execSQL("INSERT INTO collection_article_cross_ref (collectionId, articleId) VALUES (2, 10)")
+                db.execSQL("INSERT INTO collection_article_cross_ref (collectionId, articleId) VALUES (1, 20)")
+                db.execSQL("INSERT INTO collection_article_cross_ref (collectionId, articleId) VALUES (2, 20)")
+            }
+
+            override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) = Unit
+        }
+
+        v2Helper.writableDatabase.close()
+        v2Helper.close()
+
+        val migratedDb = Room.databaseBuilder(context, EruditoDatabase::class.java, dbName)
+            .addMigrations(EruditoDatabase.MIGRATION_1_2, EruditoDatabase.MIGRATION_2_3)
+            .allowMainThreadQueries()
+            .build()
+
+        try {
+            val migratedCollectionDao = migratedDb.collectionDao()
+            val migratedArticleDao = migratedDb.articleDao()
+
+            val collections = migratedCollectionDao.getAllCollectionsWithCount().first()
+            assertEquals(2, collections.size)
+            assertEquals(1, collections.first { it.collection.id == 1L }.articleCount)
+            assertEquals(2, collections.first { it.collection.id == 2L }.articleCount)
+
+            val articles = migratedArticleDao.getAllArticles().first()
+            assertEquals(2, articles.size)
+            assertTrue(articles.all { it.lastSyncedAt == null })
+
+            val curated = migratedArticleDao.getArticleById(10L)
+            assertNotNull(curated)
+            assertNull(curated?.wikipediaPageId)
+            assertEquals(3000L, curated?.lastUpdated)
+            assertNull(curated?.lastSyncedAt)
+
+            val wikiArticle = migratedArticleDao.getArticleById(20L)
+            assertNotNull(wikiArticle)
+            assertEquals(9988L, wikiArticle?.wikipediaPageId)
+            assertEquals(4000L, wikiArticle?.lastUpdated)
+            assertNull(wikiArticle?.lastSyncedAt)
+            assertEquals(setOf(1L, 2L), migratedArticleDao.getCollectionIdsForArticle(20L).first().toSet())
+
+            // Verifica atualização via @Update após migração preservando vínculos N:N
+            migratedArticleDao.updateArticle(
+                wikiArticle!!.copy(
+                    content = "Texto quântico atualizado",
+                    lastUpdated = 5000L,
+                    lastSyncedAt = 5000L
+                )
+            )
+            val refreshed = migratedArticleDao.getArticleById(20L)
+            assertEquals("Texto quântico atualizado", refreshed?.content)
+            assertEquals(5000L, refreshed?.lastUpdated)
+            assertEquals(5000L, refreshed?.lastSyncedAt)
+            assertEquals(setOf(1L, 2L), migratedArticleDao.getCollectionIdsForArticle(20L).first().toSet())
+        } finally {
+            migratedDb.close()
+            context.deleteDatabase(dbName)
+        }
+    }
+
+    @Test
+    fun updateArticlePreservesPrimaryKeyAndAllCrossRefs() = runTest {
+        val col1Id = collectionDao.insertCollection(CollectionEntity(name = "Astronomia"))
+        val col2Id = collectionDao.insertCollection(CollectionEntity(name = "História"))
+
+        val articleId = articleDao.saveArticleAndAssociateCollections(
+            article = ArticleEntity(
+                title = "Galileu Galilei",
+                url = "https://pt.wikipedia.org/wiki/Galileu_Galilei",
+                description = "Astrônomo italiano",
+                content = "Texto original",
+                imageUrl = "https://upload.wikimedia.org/galileu.jpg",
+                lastUpdated = 1000L,
+                wikipediaPageId = 1234L,
+                lastSyncedAt = null
+            ),
+            collectionIds = listOf(col1Id, col2Id)
+        )
+
+        val stored = articleDao.getArticleById(articleId)!!
+        articleDao.updateArticle(
+            stored.copy(
+                content = "Texto sincronizado",
+                lastUpdated = 9000L,
+                lastSyncedAt = 9000L
+            )
+        )
+
+        val updated = articleDao.getArticleById(articleId)!!
+        assertEquals(articleId, updated.id)
+        assertEquals("Texto sincronizado", updated.content)
+        assertEquals(9000L, updated.lastUpdated)
+        assertEquals(9000L, updated.lastSyncedAt)
+        assertEquals(setOf(col1Id, col2Id), articleDao.getCollectionIdsForArticle(articleId).first().toSet())
     }
 }

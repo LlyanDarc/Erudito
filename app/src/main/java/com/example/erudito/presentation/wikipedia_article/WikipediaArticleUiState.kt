@@ -6,7 +6,11 @@ import com.example.erudito.domain.model.WikipediaArticle
 sealed interface WikipediaArticleUiState {
     data object Initial : WikipediaArticleUiState
     data object Loading : WikipediaArticleUiState
-    data class Success(val article: WikipediaArticle) : WikipediaArticleUiState
+    data class Success(
+        val article: WikipediaArticle,
+        val isLocalFallback: Boolean = false,
+        val localLastUpdated: Long? = null
+    ) : WikipediaArticleUiState
     data class Error(val message: String) : WikipediaArticleUiState
 }
 
@@ -18,7 +22,8 @@ data class WikipediaArticleCollectionsUiState(
     val isLoadingCollections: Boolean = true,
     val isSaving: Boolean = false,
     val isCreatingCollection: Boolean = false,
-    val pickerErrorMessage: String? = null
+    val pickerErrorMessage: String? = null,
+    val isOnline: Boolean = true
 ) {
     val isSaved: Boolean get() = savedCollectionIds.isNotEmpty()
     val savedCollectionsCount: Int get() = savedCollectionIds.size

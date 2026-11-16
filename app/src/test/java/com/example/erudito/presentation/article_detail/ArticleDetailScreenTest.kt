@@ -17,15 +17,16 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import androidx.lifecycle.SavedStateHandle
+import com.example.erudito.domain.connectivity.FakeConnectivityObserver
 import com.example.erudito.domain.model.Article
 import com.example.erudito.domain.repository.ArticleRepository
 import com.example.erudito.domain.repository.FakeArticleRepository
 import com.example.erudito.domain.repository.FakeCollectionRepository
 import com.example.erudito.domain.usecase.AddArticleToCollectionsUseCase
 import com.example.erudito.domain.usecase.CreateCollectionUseCase
-import com.example.erudito.domain.usecase.GetArticleByIdUseCase
 import com.example.erudito.domain.usecase.GetCollectionIdsForArticleUseCase
 import com.example.erudito.domain.usecase.GetCollectionsUseCase
+import com.example.erudito.domain.usecase.ObserveArticleByIdUseCase
 import com.example.erudito.domain.usecase.RemoveArticleFromCollectionUseCase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -53,11 +54,12 @@ class ArticleDetailScreenTest {
     private fun buildViewModel(
         articleId: Long,
         collectionRepo: FakeCollectionRepository,
-        articleRepo: ArticleRepository
+        articleRepo: ArticleRepository,
+        connectivityObserver: FakeConnectivityObserver = FakeConnectivityObserver()
     ): ArticleDetailViewModel {
         return ArticleDetailViewModel(
             savedStateHandle = SavedStateHandle(mapOf("articleId" to articleId)),
-            getArticleByIdUseCase = GetArticleByIdUseCase(articleRepo),
+            observeArticleByIdUseCase = ObserveArticleByIdUseCase(articleRepo),
             getCollectionsUseCase = GetCollectionsUseCase(collectionRepo),
             createCollectionUseCase = CreateCollectionUseCase(collectionRepo),
             addArticleToCollectionsUseCase = AddArticleToCollectionsUseCase(
@@ -65,7 +67,8 @@ class ArticleDetailScreenTest {
                 collectionRepository = collectionRepo
             ),
             removeArticleFromCollectionUseCase = RemoveArticleFromCollectionUseCase(articleRepo),
-            getCollectionIdsForArticleUseCase = GetCollectionIdsForArticleUseCase(articleRepo)
+            getCollectionIdsForArticleUseCase = GetCollectionIdsForArticleUseCase(articleRepo),
+            connectivityObserver = connectivityObserver
         )
     }
 
@@ -325,5 +328,43 @@ class ArticleDetailScreenTest {
             .performClick()
 
         assertEquals(false, clicked)
+    }
+
+    @Test
+    fun `ArticleDetailScreen displays live connectivity badge and preserves offline reading when disconnected`(): Unit = runBlocking {
+        val dispatcher = UnconfinedTestDispatcher()
+        Dispatchers.setMain(dispatcher)
+        try {
+            val collectionRepo = FakeCollectionRepository()
+            val articleRepo = FakeArticleRepository()
+            val connectivityObserver = FakeConnectivityObserver(initialOnline = false)
+            val articleId = articleRepo.insertArticle(
+                Article(
+                    title = "Alan Turing",
+                    content = "Pioneiro da ciência da computação.",
+                    url = "https://pt.wikipedia.org/wiki/Alan_Turing",
+                    wikipediaPageId = 101L
+                )
+            )
+            val viewModel = buildViewModel(articleId, collectionRepo, articleRepo, connectivityObserver)
+
+            composeTestRule.setContent {
+                ArticleDetailScreen(
+                    viewModel = viewModel,
+                    onNavigateBack = {}
+                )
+            }
+
+            composeTestRule.waitForIdle()
+            composeTestRule.onNodeWithTag("article_detail_connectivity_badge").assertIsDisplayed()
+            composeTestRule.onNodeWithText("Sem conexão").assertIsDisplayed()
+            composeTestRule.onNodeWithText("Pioneiro da ciência da computação.").assertIsDisplayed()
+
+            connectivityObserver.setOnline(true)
+            composeTestRule.waitForIdle()
+            composeTestRule.onNodeWithText("Online").assertIsDisplayed()
+        } finally {
+            Dispatchers.resetMain()
+        }
     }
 }

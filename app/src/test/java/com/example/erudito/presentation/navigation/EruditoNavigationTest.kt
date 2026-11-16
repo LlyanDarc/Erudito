@@ -2,10 +2,13 @@ package com.example.erudito.presentation.navigation
 
 import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.test.hasScrollToNodeAction
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextInput
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
@@ -16,6 +19,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
+import com.example.erudito.domain.connectivity.ConnectivityObserver
+import com.example.erudito.domain.connectivity.FakeConnectivityObserver
 import com.example.erudito.domain.model.Article
 import com.example.erudito.domain.model.Collection
 import com.example.erudito.domain.model.CollectionWithArticles
@@ -27,12 +32,13 @@ import com.example.erudito.domain.repository.WikipediaRepository
 import com.example.erudito.domain.usecase.AddArticleToCollectionsUseCase
 import com.example.erudito.domain.usecase.CreateCollectionUseCase
 import com.example.erudito.domain.usecase.DeleteCollectionUseCase
-import com.example.erudito.domain.usecase.GetArticleByIdUseCase
 import com.example.erudito.domain.usecase.GetCollectionIdsForArticleUseCase
 import com.example.erudito.domain.usecase.GetCollectionWithArticlesUseCase
 import com.example.erudito.domain.usecase.GetCollectionsUseCase
+import com.example.erudito.domain.usecase.GetSavedArticleByWikipediaPageIdUseCase
 import com.example.erudito.domain.usecase.GetSavedArticlesUseCase
 import com.example.erudito.domain.usecase.GetWikipediaArticleUseCase
+import com.example.erudito.domain.usecase.ObserveArticleByIdUseCase
 import com.example.erudito.domain.usecase.RemoveArticleFromCollectionUseCase
 import com.example.erudito.domain.usecase.RenameCollectionUseCase
 import com.example.erudito.domain.usecase.SaveWikipediaArticleToCollectionsUseCase
@@ -305,12 +311,81 @@ class EruditoNavigationTest {
         }
     }
 
+    @Test
+    fun `offline mode allows local navigation to saved articles and blocks online search cleanly`() {
+        runBlocking {
+            val dispatcher = UnconfinedTestDispatcher()
+            Dispatchers.setMain(dispatcher)
+            try {
+                val collectionRepo = FakeCollectionRepository()
+                val articleRepo = FakeArticleRepository()
+                val connectivityObserver = FakeConnectivityObserver(initialOnline = false)
+                val collectionId = collectionRepo.createCollection("Física")
+                val articleId = articleRepo.insertArticle(
+                    Article(
+                        id = 20L,
+                        title = "Albert Einstein",
+                        url = "https://pt.wikipedia.org/wiki/Albert_Einstein",
+                        description = "Físico teórico",
+                        content = "Teoria da relatividade.",
+                        lastUpdated = 1_700_000_000_000L,
+                        wikipediaPageId = 99L
+                    )
+                )
+                val savedArticle = articleRepo.getArticleById(articleId)!!
+                collectionRepo.setCollectionWithArticles(
+                    collectionId,
+                    CollectionWithArticles(
+                        collection = Collection(id = collectionId, name = "Física", articleCount = 1),
+                        articles = listOf(savedArticle)
+                    )
+                )
+
+                lateinit var navController: NavHostController
+
+                composeTestRule.setContent {
+                    navController = rememberNavController()
+                    TestEruditoNavHost(
+                        navController = navController,
+                        collectionRepo = collectionRepo,
+                        articleRepo = articleRepo,
+                        wikipediaRepo = FakeNavigationWikipediaRepository(),
+                        connectivityObserver = connectivityObserver
+                    )
+                }
+
+                composeTestRule.waitForIdle()
+                composeTestRule.onNodeWithText("Modo Offline").assertExists()
+
+                // Vai à SearchScreen e confirma banner offline
+                composeTestRule.onNodeWithTag("home_search_button").performClick()
+                composeTestRule.waitForIdle()
+                composeTestRule.onNodeWithTag("search_offline_banner").assertExists()
+
+                // Volta à Home e navega offline até o artigo salvo localmente
+                composeTestRule.onNodeWithTag("top_bar_back_button").performClick()
+                composeTestRule.waitForIdle()
+                composeTestRule.onNode(hasScrollToNodeAction())
+                    .performScrollToNode(hasTestTag("article_card_$articleId"))
+                composeTestRule.onNodeWithTag("article_card_$articleId").performClick()
+                composeTestRule.waitForIdle()
+                assertEquals(Screen.ArticleDetail.route, navController.currentDestination?.route)
+                composeTestRule.onNodeWithTag("article_detail_connectivity_badge").assertExists()
+                composeTestRule.onNodeWithText("Sem conexão").assertExists()
+                composeTestRule.onNodeWithText("Teoria da relatividade.").assertExists()
+            } finally {
+                Dispatchers.resetMain()
+            }
+        }
+    }
+
     @Composable
     private fun TestEruditoNavHost(
         navController: NavHostController,
         collectionRepo: FakeCollectionRepository,
         articleRepo: FakeArticleRepository,
-        wikipediaRepo: WikipediaRepository
+        wikipediaRepo: WikipediaRepository,
+        connectivityObserver: ConnectivityObserver = FakeConnectivityObserver(initialOnline = true)
     ) {
         EruditoNavHost(
             navController = navController,
@@ -321,7 +396,8 @@ class EruditoNavigationTest {
                         getSavedArticlesUseCase = GetSavedArticlesUseCase(articleRepo),
                         createCollectionUseCase = CreateCollectionUseCase(collectionRepo),
                         renameCollectionUseCase = RenameCollectionUseCase(collectionRepo),
-                        deleteCollectionUseCase = DeleteCollectionUseCase(collectionRepo)
+                        deleteCollectionUseCase = DeleteCollectionUseCase(collectionRepo),
+                        connectivityObserver = connectivityObserver
                     )
                 }
             },
@@ -350,7 +426,7 @@ class EruditoNavigationTest {
                 navViewModel(backStackEntry) { savedStateHandle ->
                     ArticleDetailViewModel(
                         savedStateHandle = savedStateHandle,
-                        getArticleByIdUseCase = GetArticleByIdUseCase(articleRepo),
+                        observeArticleByIdUseCase = ObserveArticleByIdUseCase(articleRepo),
                         getCollectionsUseCase = GetCollectionsUseCase(collectionRepo),
                         createCollectionUseCase = CreateCollectionUseCase(collectionRepo),
                         addArticleToCollectionsUseCase = AddArticleToCollectionsUseCase(
@@ -358,14 +434,16 @@ class EruditoNavigationTest {
                             collectionRepository = collectionRepo
                         ),
                         removeArticleFromCollectionUseCase = RemoveArticleFromCollectionUseCase(articleRepo),
-                        getCollectionIdsForArticleUseCase = GetCollectionIdsForArticleUseCase(articleRepo)
+                        getCollectionIdsForArticleUseCase = GetCollectionIdsForArticleUseCase(articleRepo),
+                        connectivityObserver = connectivityObserver
                     )
                 }
             },
             searchViewModelProvider = { backStackEntry ->
                 navViewModel(backStackEntry) {
                     SearchViewModel(
-                        searchWikipediaArticlesUseCase = SearchWikipediaArticlesUseCase(wikipediaRepo)
+                        searchWikipediaArticlesUseCase = SearchWikipediaArticlesUseCase(wikipediaRepo),
+                        connectivityObserver = connectivityObserver
                     )
                 }
             },
@@ -386,7 +464,9 @@ class EruditoNavigationTest {
                             collectionRepository = collectionRepo
                         ),
                         removeArticleFromCollectionUseCase = RemoveArticleFromCollectionUseCase(articleRepo),
-                        getCollectionIdsForArticleUseCase = GetCollectionIdsForArticleUseCase(articleRepo)
+                        getCollectionIdsForArticleUseCase = GetCollectionIdsForArticleUseCase(articleRepo),
+                        getSavedArticleByWikipediaPageIdUseCase = GetSavedArticleByWikipediaPageIdUseCase(articleRepo),
+                        connectivityObserver = connectivityObserver
                     )
                 }
             }

@@ -20,6 +20,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Book
+import androidx.compose.material.icons.filled.CloudDone
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.CollectionsBookmark
 import androidx.compose.material.icons.filled.Folder
@@ -133,26 +134,42 @@ fun HomeScreenContent(
             EruditoTopAppBar(
                 title = "Erudito",
                 actions = {
+                    val badgeContainerColor = if (uiState.isOnline) {
+                        MaterialTheme.colorScheme.primaryContainer
+                    } else {
+                        MaterialTheme.colorScheme.secondaryContainer
+                    }
+                    val badgeContentColor = if (uiState.isOnline) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        MaterialTheme.colorScheme.onSecondaryContainer
+                    }
                     Surface(
                         shape = RoundedCornerShape(16.dp),
-                        color = MaterialTheme.colorScheme.primaryContainer,
-                        modifier = Modifier.padding(end = 12.dp)
+                        color = badgeContainerColor,
+                        modifier = Modifier
+                            .padding(end = 12.dp)
+                            .testTag("home_connectivity_badge")
                     ) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
                         ) {
                             Icon(
-                                imageVector = Icons.Default.CloudOff,
+                                imageVector = if (uiState.isOnline) {
+                                    Icons.Default.CloudDone
+                                } else {
+                                    Icons.Default.CloudOff
+                                },
                                 contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
+                                tint = badgeContentColor,
                                 modifier = Modifier.size(14.dp)
                             )
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(
-                                text = "100% Offline",
+                                text = if (uiState.isOnline) "Online" else "Modo Offline",
                                 style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                                color = MaterialTheme.colorScheme.primary
+                                color = badgeContentColor
                             )
                         }
                     }
@@ -309,14 +326,23 @@ fun HomeScreenContent(
                                         }
                                         Surface(
                                             shape = RoundedCornerShape(8.dp),
-                                            color = MaterialTheme.colorScheme.primaryContainer
+                                            color = if (uiState.isOnline) {
+                                                MaterialTheme.colorScheme.primaryContainer
+                                            } else {
+                                                MaterialTheme.colorScheme.secondaryContainer
+                                            },
+                                            modifier = Modifier.testTag("home_search_connectivity_badge")
                                         ) {
                                             Text(
-                                                text = "Online",
+                                                text = if (uiState.isOnline) "Online" else "Offline",
                                                 style = MaterialTheme.typography.labelSmall.copy(
                                                     fontWeight = FontWeight.Bold
                                                 ),
-                                                color = MaterialTheme.colorScheme.primary,
+                                                color = if (uiState.isOnline) {
+                                                    MaterialTheme.colorScheme.primary
+                                                } else {
+                                                    MaterialTheme.colorScheme.onSecondaryContainer
+                                                },
                                                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                                             )
                                         }

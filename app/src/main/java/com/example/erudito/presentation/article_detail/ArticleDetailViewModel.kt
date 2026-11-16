@@ -3,11 +3,12 @@ package com.example.erudito.presentation.article_detail
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.erudito.domain.connectivity.ConnectivityObserver
 import com.example.erudito.domain.usecase.AddArticleToCollectionsUseCase
 import com.example.erudito.domain.usecase.CreateCollectionUseCase
-import com.example.erudito.domain.usecase.GetArticleByIdUseCase
 import com.example.erudito.domain.usecase.GetCollectionIdsForArticleUseCase
 import com.example.erudito.domain.usecase.GetCollectionsUseCase
+import com.example.erudito.domain.usecase.ObserveArticleByIdUseCase
 import com.example.erudito.domain.usecase.RemoveArticleFromCollectionUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
@@ -26,12 +27,13 @@ import kotlinx.coroutines.launch
 @HiltViewModel
 class ArticleDetailViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
-    private val getArticleByIdUseCase: GetArticleByIdUseCase,
+    private val observeArticleByIdUseCase: ObserveArticleByIdUseCase,
     private val getCollectionsUseCase: GetCollectionsUseCase,
     private val createCollectionUseCase: CreateCollectionUseCase,
     private val addArticleToCollectionsUseCase: AddArticleToCollectionsUseCase,
     private val removeArticleFromCollectionUseCase: RemoveArticleFromCollectionUseCase,
-    private val getCollectionIdsForArticleUseCase: GetCollectionIdsForArticleUseCase
+    private val getCollectionIdsForArticleUseCase: GetCollectionIdsForArticleUseCase,
+    private val connectivityObserver: ConnectivityObserver
 ) : ViewModel() {
 
     val articleId: Long = savedStateHandle.get<Long>("articleId")
@@ -39,16 +41,28 @@ class ArticleDetailViewModel @Inject constructor(
         ?: 0L
 
     private var collectionIdsJob: Job? = null
+    private var observedArticleId: Long? = null
 
-    private val _uiState = MutableStateFlow(ArticleDetailUiState())
+    private val _uiState = MutableStateFlow(
+        ArticleDetailUiState(isOnline = connectivityObserver.isCurrentlyOnline())
+    )
     val uiState: StateFlow<ArticleDetailUiState> = _uiState.asStateFlow()
 
     private val _feedbackEvents = Channel<String>(Channel.BUFFERED)
     val feedbackEvents: Flow<String> = _feedbackEvents.receiveAsFlow()
 
     init {
+        observeConnectivity()
         observeAvailableCollections()
-        loadArticle()
+        observeArticle()
+    }
+
+    private fun observeConnectivity() {
+        viewModelScope.launch {
+            connectivityObserver.isOnline.collect { online ->
+                _uiState.update { it.copy(isOnline = online) }
+            }
+        }
     }
 
     private fun observeAvailableCollections() {
@@ -75,6 +89,10 @@ class ArticleDetailViewModel @Inject constructor(
 
     private fun observeCollectionAssociations(targetArticleId: Long) {
         if (targetArticleId <= 0L) return
+        if (collectionIdsJob?.isActive == true && observedArticleId == targetArticleId) {
+            return
+        }
+        observedArticleId = targetArticleId
         collectionIdsJob?.cancel()
         collectionIdsJob = viewModelScope.launch {
             getCollectionIdsForArticleUseCase(targetArticleId)
@@ -101,34 +119,48 @@ class ArticleDetailViewModel @Inject constructor(
         }
     }
 
-    private fun loadArticle() {
-        viewModelScope.launch {
-            try {
-                val article = getArticleByIdUseCase(articleId)
-                _uiState.update {
-                    it.copy(
-                        isLoading = false,
-                        article = article,
-                        errorMessage = if (article == null) {
-                            "Artigo não encontrado no armazenamento local"
-                        } else {
-                            null
-                        }
-                    )
-                }
-                if (article != null) {
-                    observeCollectionAssociations(article.id)
-                }
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                _uiState.update {
-                    it.copy(
-                        isLoading = false,
-                        errorMessage = e.message ?: "Erro ao carregar artigo"
-                    )
-                }
+    private fun observeArticle() {
+        if (articleId <= 0L) {
+            _uiState.update {
+                it.copy(
+                    isLoading = false,
+                    article = null,
+                    errorMessage = "Artigo não encontrado no armazenamento local"
+                )
             }
+            return
+        }
+
+        viewModelScope.launch {
+            observeArticleByIdUseCase(articleId)
+                .catch { e ->
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            errorMessage = e.message ?: "Erro ao carregar artigo"
+                        )
+                    }
+                }
+                .collect { article ->
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            article = article,
+                            errorMessage = if (article == null) {
+                                "Artigo não encontrado no armazenamento local"
+                            } else {
+                                null
+                            }
+                        )
+                    }
+                    if (article != null) {
+                        observeCollectionAssociations(article.id)
+                    } else {
+                        collectionIdsJob?.cancel()
+                        collectionIdsJob = null
+                        observedArticleId = null
+                    }
+                }
         }
     }
 
