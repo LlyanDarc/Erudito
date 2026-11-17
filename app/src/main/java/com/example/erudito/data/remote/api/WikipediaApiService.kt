@@ -1,7 +1,11 @@
 package com.example.erudito.data.remote.api
 
 import com.example.erudito.data.remote.dto.WikipediaApiResponseDto
+import okhttp3.ResponseBody
+import retrofit2.Response
 import retrofit2.http.GET
+import retrofit2.http.Headers
+import retrofit2.http.Path
 import retrofit2.http.Query
 
 interface WikipediaApiService {
@@ -33,13 +37,18 @@ interface WikipediaApiService {
         @Query("action") action: String = "query",
         @Query("format") format: String = "json",
         @Query("formatversion") formatVersion: Int = 2,
-        @Query("prop") prop: String = "extracts|pageimages|description|info",
-        @Query("explaintext") explainText: Int = 1,
+        @Query("prop") prop: String = "pageimages|description|info",
         @Query("piprop") piProp: String = "original|thumbnail",
         @Query("pithumbsize") piThumbSize: Int = 800,
         @Query("inprop") inProp: String = "url",
         @Query("redirects") redirects: Int = 1
     ): WikipediaApiResponseDto
+
+    @Headers("Accept: text/html; charset=utf-8")
+    @GET("w/rest.php/v1/page/{title}/html")
+    suspend fun getArticleHtml(
+        @Path("title") title: String
+    ): Response<ResponseBody>
 
     @GET("w/api.php")
     suspend fun getArticleByTitle(
@@ -47,8 +56,7 @@ interface WikipediaApiService {
         @Query("action") action: String = "query",
         @Query("format") format: String = "json",
         @Query("formatversion") formatVersion: Int = 2,
-        @Query("prop") prop: String = "extracts|pageimages|description|info",
-        @Query("explaintext") explainText: Int = 1,
+        @Query("prop") prop: String = "pageimages|description|info",
         @Query("piprop") piProp: String = "original|thumbnail",
         @Query("pithumbsize") piThumbSize: Int = 800,
         @Query("inprop") inProp: String = "url",

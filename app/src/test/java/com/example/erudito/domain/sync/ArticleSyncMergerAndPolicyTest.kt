@@ -3,6 +3,7 @@ package com.example.erudito.domain.sync
 import com.example.erudito.data.mapper.toWikipediaArticleOrNull
 import com.example.erudito.data.remote.dto.WikipediaPageDto
 import com.example.erudito.domain.model.Article
+import com.example.erudito.domain.model.ArticleContentFormat
 import com.example.erudito.domain.model.WikipediaArticle
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -325,5 +326,217 @@ class ArticleSyncMergerAndPolicyTest {
     @Test(expected = IllegalArgumentException::class)
     fun syncPolicyRejectsNegativeInterval() {
         SyncPolicy(minimumRefreshIntervalMs = -1L)
+    }
+
+    @Test
+    fun scenarioA_completeStructuredHtmlIsNeverReplacedByPlainTextEmptyOrIncompleteHtml() {
+        val localHtml = """<section><p>Equação <span class="erudito-math-inline" data-tex="E=mc^2"></span></p></section>"""
+        val local = sampleLocalArticle(
+            content = localHtml,
+            lastUpdated = 2_000L,
+            lastSyncedAt = 3_000L
+        ).copy(
+            contentFormat = ArticleContentFormat.STRUCTURED_HTML,
+            extractedFormulaCount = 5,
+            unextractableFormulaCount = 0
+        )
+
+        // 1. Remoto PLAIN_TEXT não deve degradar STRUCTURED_HTML íntegro
+        val remotePlain = WikipediaArticle(
+            pageId = 123L,
+            title = local.title,
+            description = local.description,
+            content = "Equação E=mc^2 em texto degradado",
+            imageUrl = local.imageUrl,
+            url = local.url,
+            hasExtractedContent = true,
+            contentFormat = ArticleContentFormat.PLAIN_TEXT
+        )
+        val plainResult = ArticleSyncMerger.merge(local = local, remote = remotePlain, syncedAtMs = 10_000L)
+        assertFalse(plainResult.hasContentChanged)
+        assertEquals(localHtml, plainResult.article.content)
+        assertEquals(ArticleContentFormat.STRUCTURED_HTML, plainResult.article.contentFormat)
+        assertEquals(5, plainResult.article.extractedFormulaCount)
+        assertEquals(0, plainResult.article.unextractableFormulaCount)
+        assertEquals(2_000L, plainResult.article.lastUpdated)
+        assertEquals(10_000L, plainResult.article.lastSyncedAt)
+
+        // 2. Remoto vazio não deve sobrescrever STRUCTURED_HTML íntegro
+        val remoteEmpty = remotePlain.copy(content = "   ", hasExtractedContent = false)
+        val emptyResult = ArticleSyncMerger.merge(local = local, remote = remoteEmpty, syncedAtMs = 11_000L)
+        assertFalse(emptyResult.hasContentChanged)
+        assertEquals(localHtml, emptyResult.article.content)
+        assertEquals(ArticleContentFormat.STRUCTURED_HTML, emptyResult.article.contentFormat)
+        assertEquals(11_000L, emptyResult.article.lastSyncedAt)
+
+        // 3. Remoto STRUCTURED_HTML com fórmulas indisponíveis não deve sobrescrever íntegro
+        val remoteIncomplete = WikipediaArticle(
+            pageId = 123L,
+            title = local.title,
+            description = local.description,
+            content = """<p><span class="erudito-math-unavailable">[Fórmula indisponível]</span></p>""",
+            imageUrl = local.imageUrl,
+            url = local.url,
+            hasExtractedContent = true,
+            contentFormat = ArticleContentFormat.STRUCTURED_HTML,
+            extractedFormulaCount = 4,
+            unextractableFormulaCount = 1
+        )
+        val incompleteResult = ArticleSyncMerger.merge(local = local, remote = remoteIncomplete, syncedAtMs = 12_000L)
+        assertFalse(incompleteResult.hasContentChanged)
+        assertEquals(localHtml, incompleteResult.article.content)
+        assertEquals(ArticleContentFormat.STRUCTURED_HTML, incompleteResult.article.contentFormat)
+        assertEquals(5, incompleteResult.article.extractedFormulaCount)
+        assertEquals(0, incompleteResult.article.unextractableFormulaCount)
+        assertEquals(2_000L, incompleteResult.article.lastUpdated)
+        assertEquals(12_000L, incompleteResult.article.lastSyncedAt)
+    }
+
+    @Test
+    fun scenarioB_incompleteStructuredHtmlIsUpgradedByCompleteStructuredHtmlAndProtectedAgainstDegradation() {
+        val localIncompleteHtml = """<p><span class="erudito-math-unavailable">[Fórmula indisponível]</span></p>"""
+        val local = sampleLocalArticle(
+            content = localIncompleteHtml,
+            lastUpdated = 2_000L,
+            lastSyncedAt = 3_000L
+        ).copy(
+            contentFormat = ArticleContentFormat.STRUCTURED_HTML,
+            extractedFormulaCount = 2,
+            unextractableFormulaCount = 1
+        )
+
+        // Não regride para PLAIN_TEXT nem aceita outro incompleto
+        val remotePlain = WikipediaArticle(
+            pageId = 123L,
+            title = local.title,
+            description = local.description,
+            content = "Texto simples",
+            imageUrl = local.imageUrl,
+            url = local.url,
+            hasExtractedContent = true,
+            contentFormat = ArticleContentFormat.PLAIN_TEXT
+        )
+        val plainResult = ArticleSyncMerger.merge(local = local, remote = remotePlain, syncedAtMs = 4_000L)
+        assertFalse(plainResult.hasContentChanged)
+        assertEquals(localIncompleteHtml, plainResult.article.content)
+        assertEquals(ArticleContentFormat.STRUCTURED_HTML, plainResult.article.contentFormat)
+        assertEquals(1, plainResult.article.unextractableFormulaCount)
+
+        // Substitui quando chega versão STRUCTURED_HTML íntegra
+        val upgradedHtml = """<p><span class="erudito-math-inline" data-tex="x^2 + y^2 = z^2"></span></p>"""
+        val remoteComplete = WikipediaArticle(
+            pageId = 123L,
+            title = local.title,
+            description = local.description,
+            content = upgradedHtml,
+            imageUrl = local.imageUrl,
+            url = local.url,
+            hasExtractedContent = true,
+            contentFormat = ArticleContentFormat.STRUCTURED_HTML,
+            extractedFormulaCount = 3,
+            unextractableFormulaCount = 0
+        )
+        val upgradedResult = ArticleSyncMerger.merge(local = local, remote = remoteComplete, syncedAtMs = 5_000L)
+        assertTrue(upgradedResult.hasContentChanged)
+        assertEquals(upgradedHtml, upgradedResult.article.content)
+        assertEquals(ArticleContentFormat.STRUCTURED_HTML, upgradedResult.article.contentFormat)
+        assertEquals(3, upgradedResult.article.extractedFormulaCount)
+        assertEquals(0, upgradedResult.article.unextractableFormulaCount)
+        assertTrue(upgradedResult.article.isStructuredHtmlComplete)
+        assertEquals(5_000L, upgradedResult.article.lastUpdated)
+        assertEquals(5_000L, upgradedResult.article.lastSyncedAt)
+    }
+
+    @Test
+    fun scenarioC_plainTextUpgradesToCompleteStructuredHtmlButRejectsIncompleteStructuredHtmlWhenLocalIsUsable() {
+        val usableLocal = sampleLocalArticle(
+            content = "Texto simples aproveitável sobre matemática.",
+            lastUpdated = 1_000L
+        ).copy(contentFormat = ArticleContentFormat.PLAIN_TEXT)
+
+        // Resposta estruturada incompleta não sobrescreve texto simples aproveitável
+        val incompleteStructured = WikipediaArticle(
+            pageId = 123L,
+            title = usableLocal.title,
+            description = usableLocal.description,
+            content = """<p>Texto <span class="erudito-math-unavailable">[Fórmula indisponível]</span></p>""",
+            imageUrl = usableLocal.imageUrl,
+            url = usableLocal.url,
+            hasExtractedContent = true,
+            contentFormat = ArticleContentFormat.STRUCTURED_HTML,
+            extractedFormulaCount = 1,
+            unextractableFormulaCount = 1
+        )
+        val rejected = ArticleSyncMerger.merge(local = usableLocal, remote = incompleteStructured, syncedAtMs = 5_000L)
+        assertFalse(rejected.hasContentChanged)
+        assertEquals("Texto simples aproveitável sobre matemática.", rejected.article.content)
+        assertEquals(ArticleContentFormat.PLAIN_TEXT, rejected.article.contentFormat)
+        assertEquals(0, rejected.article.unextractableFormulaCount)
+        assertEquals(1_000L, rejected.article.lastUpdated)
+        assertEquals(5_000L, rejected.article.lastSyncedAt)
+
+        // Resposta estruturada íntegra atualiza texto simples para STRUCTURED_HTML
+        val completeHtml = """<p>Texto <span class="erudito-math-inline" data-tex="\pi"></span></p>"""
+        val completeStructured = incompleteStructured.copy(
+            content = completeHtml,
+            extractedFormulaCount = 2,
+            unextractableFormulaCount = 0
+        )
+        val upgraded = ArticleSyncMerger.merge(local = usableLocal, remote = completeStructured, syncedAtMs = 6_000L)
+        assertTrue(upgraded.hasContentChanged)
+        assertEquals(completeHtml, upgraded.article.content)
+        assertEquals(ArticleContentFormat.STRUCTURED_HTML, upgraded.article.contentFormat)
+        assertEquals(2, upgraded.article.extractedFormulaCount)
+        assertEquals(0, upgraded.article.unextractableFormulaCount)
+        assertEquals(6_000L, upgraded.article.lastUpdated)
+        assertEquals(6_000L, upgraded.article.lastSyncedAt)
+
+        // Quando local não possui conteúdo aproveitável (null/blank), aceita HTML estruturado mesmo incompleto
+        val emptyLocal = usableLocal.copy(content = null)
+        val filledFromEmpty = ArticleSyncMerger.merge(local = emptyLocal, remote = incompleteStructured, syncedAtMs = 7_000L)
+        assertTrue(filledFromEmpty.hasContentChanged)
+        assertEquals(incompleteStructured.content, filledFromEmpty.article.content)
+        assertEquals(ArticleContentFormat.STRUCTURED_HTML, filledFromEmpty.article.contentFormat)
+        assertEquals(1, filledFromEmpty.article.extractedFormulaCount)
+        assertEquals(1, filledFromEmpty.article.unextractableFormulaCount)
+    }
+
+    @Test
+    fun scenarioD_E_F_rejectsNegativeCountsAndUpdatesMetadataWithoutDegradingStructuredContent() {
+        val localHtml = """<p><span class="erudito-math-inline" data-tex="a+b"></span></p>"""
+        val local = sampleLocalArticle(
+            description = "Descrição antiga",
+            content = localHtml,
+            lastUpdated = 1_000L,
+            lastSyncedAt = 1_500L
+        ).copy(
+            contentFormat = ArticleContentFormat.STRUCTURED_HTML,
+            extractedFormulaCount = 1,
+            unextractableFormulaCount = 0
+        )
+
+        // Contadores negativos não substituem conteúdo nem corrompem formato
+        val negativeCountsRemote = WikipediaArticle(
+            pageId = 123L,
+            title = "Platão (Atualizado)",
+            description = "Nova descrição",
+            content = "<p>Inválido</p>",
+            imageUrl = local.imageUrl,
+            url = local.url,
+            hasExtractedContent = true,
+            contentFormat = ArticleContentFormat.STRUCTURED_HTML,
+            extractedFormulaCount = -1,
+            unextractableFormulaCount = 0
+        )
+        val merged = ArticleSyncMerger.merge(local = local, remote = negativeCountsRemote, syncedAtMs = 8_000L)
+        assertTrue(merged.hasContentChanged) // título e descrição válidos mudaram (Cenário E)
+        assertEquals("Platão (Atualizado)", merged.article.title)
+        assertEquals("Nova descrição", merged.article.description)
+        assertEquals(localHtml, merged.article.content)
+        assertEquals(ArticleContentFormat.STRUCTURED_HTML, merged.article.contentFormat)
+        assertEquals(1, merged.article.extractedFormulaCount)
+        assertEquals(0, merged.article.unextractableFormulaCount)
+        assertEquals(8_000L, merged.article.lastUpdated)
+        assertEquals(8_000L, merged.article.lastSyncedAt)
     }
 }

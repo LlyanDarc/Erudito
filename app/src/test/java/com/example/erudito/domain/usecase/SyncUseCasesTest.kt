@@ -8,6 +8,7 @@ import com.example.erudito.data.local.entity.CollectionEntity
 import com.example.erudito.data.repository.ArticleRepositoryImpl
 import com.example.erudito.domain.connectivity.ConnectivityObserver
 import com.example.erudito.domain.model.Article
+import com.example.erudito.domain.model.ArticleContentFormat
 import com.example.erudito.domain.model.WikipediaArticle
 import com.example.erudito.domain.model.WikipediaException
 import com.example.erudito.domain.model.WikipediaSearchResult
@@ -475,6 +476,104 @@ class SyncUseCasesTest {
         } catch (_: CancellationException) {
             // Esperado
         }
+    }
+
+    @Test
+    fun syncPreservesStructuredHtmlAndFormulaCountsInRoomWhenRemoteIsDegraded() = runTest {
+        val colId = database.collectionDao().insertCollection(CollectionEntity(name = "Álgebra"))
+        val structuredHtml = """<section><p>Identidade <span class="erudito-math-inline" data-tex="a^2-b^2=(a-b)(a+b)"></span></p></section>"""
+
+        val savedId = articleRepository.saveArticleAndAssociateCollections(
+            article = Article(
+                title = "Álgebra linear",
+                url = "https://pt.wikipedia.org/wiki/%C3%81lgebra_linear",
+                description = "Ramo da matemática",
+                content = structuredHtml,
+                imageUrl = null,
+                lastUpdated = 10_000L,
+                wikipediaPageId = 10342L,
+                lastSyncedAt = 10_000L,
+                contentFormat = ArticleContentFormat.STRUCTURED_HTML,
+                extractedFormulaCount = 8,
+                unextractableFormulaCount = 0
+            ),
+            collectionIds = listOf(colId)
+        )
+
+        // Simula retorno remoto degradado (PLAIN_TEXT ou HTML com fórmula indisponível)
+        fakeWikipediaRepository.responses[10342L] = Result.success(
+            WikipediaArticle(
+                pageId = 10342L,
+                title = "Álgebra linear",
+                description = "Ramo da matemática",
+                content = "Texto degradado sem KaTeX",
+                url = "https://pt.wikipedia.org/wiki/%C3%81lgebra_linear",
+                hasExtractedContent = true,
+                contentFormat = ArticleContentFormat.PLAIN_TEXT
+            )
+        )
+
+        val outcome = refreshUseCase(articleId = savedId, forceRefresh = true, nowMs = 90_000L)
+        assertTrue(outcome is RefreshArticleOutcome.Unchanged)
+
+        val reloaded = articleRepository.getArticleById(savedId)!!
+        assertEquals(structuredHtml, reloaded.content)
+        assertEquals(ArticleContentFormat.STRUCTURED_HTML, reloaded.contentFormat)
+        assertEquals(8, reloaded.extractedFormulaCount)
+        assertEquals(0, reloaded.unextractableFormulaCount)
+        assertEquals(10_000L, reloaded.lastUpdated)
+        assertEquals(90_000L, reloaded.lastSyncedAt)
+        assertEquals(listOf(colId), articleRepository.getCollectionIdsForArticle(savedId).first())
+    }
+
+    @Test
+    fun syncUpgradesIncompleteStructuredHtmlInRoomToCompleteAndPreservesCrossRefs() = runTest {
+        val col1 = database.collectionDao().insertCollection(CollectionEntity(name = "Cálculo"))
+        val col2 = database.collectionDao().insertCollection(CollectionEntity(name = "Equações"))
+
+        val savedId = articleRepository.saveArticleAndAssociateCollections(
+            article = Article(
+                title = "Equação diferencial",
+                url = "https://pt.wikipedia.org/wiki/Equa%C3%A7%C3%A3o_diferencial",
+                description = "Equação com derivadas",
+                content = """<p><span class="erudito-math-unavailable">[Fórmula indisponível]</span></p>""",
+                lastUpdated = 5_000L,
+                wikipediaPageId = 6321L,
+                lastSyncedAt = 5_000L,
+                contentFormat = ArticleContentFormat.STRUCTURED_HTML,
+                extractedFormulaCount = 3,
+                unextractableFormulaCount = 1
+            ),
+            collectionIds = listOf(col1, col2)
+        )
+
+        val completeHtml = """<section><div class="erudito-math-block" data-tex="\frac{dy}{dx} = y"></div></section>"""
+        fakeWikipediaRepository.responses[6321L] = Result.success(
+            WikipediaArticle(
+                pageId = 6321L,
+                title = "Equação diferencial",
+                description = "Equação com derivadas",
+                content = completeHtml,
+                url = "https://pt.wikipedia.org/wiki/Equa%C3%A7%C3%A3o_diferencial",
+                hasExtractedContent = true,
+                contentFormat = ArticleContentFormat.STRUCTURED_HTML,
+                extractedFormulaCount = 4,
+                unextractableFormulaCount = 0
+            )
+        )
+
+        val outcome = refreshUseCase(articleId = savedId, forceRefresh = true, nowMs = 120_000L)
+        assertTrue(outcome is RefreshArticleOutcome.Updated)
+
+        val reloaded = articleRepository.getArticleById(savedId)!!
+        assertEquals(completeHtml, reloaded.content)
+        assertEquals(ArticleContentFormat.STRUCTURED_HTML, reloaded.contentFormat)
+        assertEquals(4, reloaded.extractedFormulaCount)
+        assertEquals(0, reloaded.unextractableFormulaCount)
+        assertTrue(reloaded.isStructuredHtmlComplete)
+        assertEquals(120_000L, reloaded.lastUpdated)
+        assertEquals(120_000L, reloaded.lastSyncedAt)
+        assertEquals(setOf(col1, col2), articleRepository.getCollectionIdsForArticle(savedId).first().toSet())
     }
 
     private class FakeSyncWikipediaRepository : WikipediaRepository {

@@ -7,6 +7,7 @@ import com.example.erudito.data.local.dao.ArticleDao
 import com.example.erudito.data.local.dao.CollectionDao
 import com.example.erudito.data.local.database.EruditoDatabase
 import com.example.erudito.data.remote.api.WikipediaApiService
+import com.example.erudito.data.remote.parser.WikipediaHtmlSanitizer
 import com.example.erudito.data.repository.ArticleRepositoryImpl
 import com.example.erudito.data.repository.CollectionRepositoryImpl
 import com.example.erudito.data.repository.WikipediaRepositoryImpl
@@ -78,12 +79,14 @@ object EruditoHiltModule {
     ): OkHttpClient {
         return OkHttpClient.Builder()
             .addInterceptor { chain ->
-                val requestWithUserAgent = chain.request()
+                val originalRequest = chain.request()
+                val requestBuilder = originalRequest
                     .newBuilder()
                     .header("User-Agent", WIKIPEDIA_USER_AGENT)
-                    .header("Accept", "application/json")
-                    .build()
-                chain.proceed(requestWithUserAgent)
+                if (originalRequest.header("Accept") == null) {
+                    requestBuilder.header("Accept", "application/json")
+                }
+                chain.proceed(requestBuilder.build())
             }
             .addInterceptor(loggingInterceptor)
             .connectTimeout(15, TimeUnit.SECONDS)
@@ -196,8 +199,20 @@ object EruditoHiltModule {
 
     @Provides
     @Singleton
-    fun provideWikipediaRepository(apiService: WikipediaApiService): WikipediaRepository {
-        return WikipediaRepositoryImpl(apiService)
+    fun provideWikipediaHtmlSanitizer(moshi: Moshi): WikipediaHtmlSanitizer {
+        return WikipediaHtmlSanitizer(moshi)
+    }
+
+    @Provides
+    @Singleton
+    fun provideWikipediaRepository(
+        apiService: WikipediaApiService,
+        htmlSanitizer: WikipediaHtmlSanitizer
+    ): WikipediaRepository {
+        return WikipediaRepositoryImpl(
+            apiService = apiService,
+            htmlSanitizer = htmlSanitizer
+        )
     }
 
     @Provides

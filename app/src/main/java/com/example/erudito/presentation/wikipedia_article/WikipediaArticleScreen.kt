@@ -60,10 +60,10 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
+import com.example.erudito.presentation.components.ArticleBodyContent
 import com.example.erudito.presentation.components.CollectionPickerDialog
 import com.example.erudito.presentation.components.EmptyStateView
 import com.example.erudito.presentation.components.EruditoTopAppBar
@@ -509,24 +509,14 @@ fun WikipediaArticleScreenContent(
                             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                             Spacer(modifier = Modifier.height(20.dp))
 
-                            if (article.content.isNotBlank()) {
-                                Text(
-                                    text = article.content,
-                                    style = MaterialTheme.typography.bodyLarge.copy(
-                                        lineHeight = 28.sp,
-                                        fontSize = 17.sp
-                                    ),
-                                    color = MaterialTheme.colorScheme.onSurface,
-                                    modifier = Modifier.testTag("wikipedia_article_content")
-                                )
-                            } else {
-                                Text(
-                                    text = "Este artigo não possui conteúdo textual disponível para exibição.",
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.testTag("wikipedia_article_content")
-                                )
-                            }
+                            ArticleBodyContent(
+                                content = article.content,
+                                contentFormat = article.contentFormat,
+                                unextractableFormulaCount = article.unextractableFormulaCount,
+                                onOpenLink = onOpenOriginalUrl,
+                                testTag = "wikipedia_article_content",
+                                emptyContentText = "Este artigo não possui conteúdo textual disponível para exibição."
+                            )
 
                             Spacer(modifier = Modifier.height(28.dp))
 

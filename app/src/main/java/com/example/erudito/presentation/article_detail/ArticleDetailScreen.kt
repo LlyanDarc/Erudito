@@ -63,10 +63,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
+import com.example.erudito.presentation.components.ArticleBodyContent
 import com.example.erudito.presentation.components.CollectionPickerDialog
 import com.example.erudito.presentation.components.EmptyStateView
 import com.example.erudito.presentation.components.EruditoTopAppBar
@@ -517,24 +517,14 @@ fun ArticleDetailScreenContent(
                     Spacer(modifier = Modifier.height(20.dp))
 
                     // Conteúdo do artigo
-                    if (!article.content.isNullOrBlank()) {
-                        Text(
-                            text = article.content,
-                            style = MaterialTheme.typography.bodyLarge.copy(
-                                lineHeight = 28.sp,
-                                fontSize = 17.sp
-                            ),
-                            color = MaterialTheme.colorScheme.onSurface,
-                            modifier = Modifier.testTag("article_detail_content")
-                        )
-                    } else {
-                        Text(
-                            text = "Nenhum conteúdo salvo para este artigo.",
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.testTag("article_detail_content")
-                        )
-                    }
+                    ArticleBodyContent(
+                        content = article.content,
+                        contentFormat = article.contentFormat,
+                        unextractableFormulaCount = article.unextractableFormulaCount,
+                        onOpenLink = onOpenOriginalUrl,
+                        testTag = "article_detail_content",
+                        emptyContentText = "Nenhum conteúdo salvo para este artigo."
+                    )
 
                     Spacer(modifier = Modifier.height(28.dp))
 

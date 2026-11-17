@@ -141,6 +141,8 @@ dependencies {
   debugImplementation(libs.androidx.compose.ui.tooling)
   implementation(libs.hilt.android)
   implementation(libs.androidx.hilt.navigation.compose)
+  implementation(libs.jsoup)
+  implementation(libs.androidx.webkit)
   "ksp"(libs.androidx.room.compiler)
   "ksp"(libs.moshi.kotlin.codegen)
   "ksp"(libs.hilt.compiler)

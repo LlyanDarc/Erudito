@@ -1,9 +1,10 @@
 package com.example.erudito.data.repository
 
 import com.example.erudito.data.mapper.toSearchResults
-import com.example.erudito.data.mapper.toWikipediaArticleOrNull
+import com.example.erudito.data.mapper.toStructuredWikipediaArticleOrNull
 import com.example.erudito.data.remote.api.WikipediaApiService
 import com.example.erudito.data.remote.dto.WikipediaApiResponseDto
+import com.example.erudito.data.remote.parser.WikipediaHtmlSanitizer
 import com.example.erudito.domain.model.WikipediaArticle
 import com.example.erudito.domain.model.WikipediaException
 import com.example.erudito.domain.model.WikipediaSearchResult
@@ -14,10 +15,12 @@ import java.io.IOException
 import java.net.SocketTimeoutException
 import javax.inject.Inject
 import kotlinx.coroutines.CancellationException
+import okhttp3.MediaType
 import retrofit2.HttpException
 
 class WikipediaRepositoryImpl @Inject constructor(
-    private val apiService: WikipediaApiService
+    private val apiService: WikipediaApiService,
+    private val htmlSanitizer: WikipediaHtmlSanitizer = WikipediaHtmlSanitizer()
 ) : WikipediaRepository {
 
     override suspend fun searchArticles(query: String): List<WikipediaSearchResult> {
@@ -28,16 +31,81 @@ class WikipediaRepositoryImpl @Inject constructor(
     }
 
     override suspend fun getArticleByPageId(pageId: Long): WikipediaArticle? {
-        val response = executeApiCall {
+        val metadataResponse = executeApiCall {
             apiService.getArticleByPageId(pageId = pageId)
         }
-        return response.toWikipediaArticleOrNull()
+        val metadataPage = metadataResponse.query?.pages?.firstOrNull() ?: return null
+        if (metadataPage.missing == true) return null
+
+        val resolvedPageId = metadataPage.pageId?.takeIf { it > 0L } ?: return null
+        val canonicalTitle = metadataPage.title?.trim()?.takeIf { it.isNotEmpty() } ?: return null
+
+        val parsoidTitle = normalizeParsoidTitle(canonicalTitle)
+        val rawHtml = executeNetworkCall {
+            val htmlResponse = apiService.getArticleHtml(title = parsoidTitle)
+            if (!htmlResponse.isSuccessful) {
+                throw WikipediaException.HttpError(
+                    statusCode = htmlResponse.code(),
+                    message = mapHttpErrorMessage(htmlResponse.code())
+                )
+            }
+            val body = htmlResponse.body() ?: throw WikipediaException.EmptyContent()
+            body.use { responseBody ->
+                val contentType = responseBody.contentType()
+                if (contentType != null && !isHtmlContentType(contentType)) {
+                    throw WikipediaException.InvalidResponse(
+                        message = "A Wikipédia retornou um formato inesperado (${contentType.type}/${contentType.subtype})."
+                    )
+                }
+                responseBody.string()
+            }
+        }
+
+        if (rawHtml.isBlank()) {
+            throw WikipediaException.EmptyContent()
+        }
+
+        val sanitizedHtml = try {
+            htmlSanitizer.sanitizeWithMetadata(rawHtml)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            throw WikipediaException.SanitizationError(cause = e)
+        }
+
+        if (sanitizedHtml.html.isBlank()) {
+            throw WikipediaException.EmptyContent()
+        }
+
+        return metadataPage.toStructuredWikipediaArticleOrNull(sanitizedHtml)
+            ?: throw WikipediaException.InvalidResponse()
     }
 
     private suspend fun executeApiCall(
         block: suspend () -> WikipediaApiResponseDto
     ): WikipediaApiResponseDto {
-        val response = try {
+        val response = executeNetworkCall(block)
+
+        response.error?.let { apiError ->
+            val detail = apiError.info?.trim()?.takeIf { it.isNotEmpty() }
+            val message = if (detail != null) {
+                "A Wikipédia retornou um erro: $detail"
+            } else {
+                "Não foi possível concluir a consulta na Wikipédia."
+            }
+            throw WikipediaException.ApiError(
+                code = apiError.code,
+                message = message
+            )
+        }
+
+        return response
+    }
+
+    private suspend fun <T> executeNetworkCall(
+        block: suspend () -> T
+    ): T {
+        return try {
             block()
         } catch (e: CancellationException) {
             throw e
@@ -58,21 +126,16 @@ class WikipediaRepositoryImpl @Inject constructor(
         } catch (e: JsonEncodingException) {
             throw WikipediaException.InvalidResponse(cause = e)
         }
+    }
 
-        response.error?.let { apiError ->
-            val detail = apiError.info?.trim()?.takeIf { it.isNotEmpty() }
-            val message = if (detail != null) {
-                "A Wikipédia retornou um erro: $detail"
-            } else {
-                "Não foi possível concluir a consulta na Wikipédia."
-            }
-            throw WikipediaException.ApiError(
-                code = apiError.code,
-                message = message
-            )
-        }
+    private fun normalizeParsoidTitle(canonicalTitle: String): String {
+        return canonicalTitle.trim().replace(' ', '_')
+    }
 
-        return response
+    private fun isHtmlContentType(mediaType: MediaType): Boolean {
+        val subtype = mediaType.subtype.lowercase()
+        return (mediaType.type.equals("text", ignoreCase = true) && subtype == "html") ||
+            subtype.contains("html", ignoreCase = true)
     }
 
     private fun mapHttpErrorMessage(statusCode: Int): String {

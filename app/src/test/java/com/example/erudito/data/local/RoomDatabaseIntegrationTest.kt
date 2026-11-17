@@ -13,6 +13,9 @@ import com.example.erudito.data.local.database.EruditoDatabase
 import com.example.erudito.data.local.entity.ArticleEntity
 import com.example.erudito.data.local.entity.CollectionArticleCrossRef
 import com.example.erudito.data.local.entity.CollectionEntity
+import com.example.erudito.data.repository.ArticleRepositoryImpl
+import com.example.erudito.domain.model.Article
+import com.example.erudito.domain.model.ArticleContentFormat
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
@@ -313,9 +316,13 @@ class RoomDatabaseIntegrationTest {
         v1Helper.writableDatabase.close()
         v1Helper.close()
 
-        // 2. Abre com Room v3 executando MIGRATION_1_2 + MIGRATION_2_3 e validação de schema
+        // 2. Abre com Room v4 executando MIGRATION_1_2 + MIGRATION_2_3 + MIGRATION_3_4 e validação de schema
         val migratedDb = Room.databaseBuilder(context, EruditoDatabase::class.java, dbName)
-            .addMigrations(EruditoDatabase.MIGRATION_1_2, EruditoDatabase.MIGRATION_2_3)
+            .addMigrations(
+                EruditoDatabase.MIGRATION_1_2,
+                EruditoDatabase.MIGRATION_2_3,
+                EruditoDatabase.MIGRATION_3_4
+            )
             .allowMainThreadQueries()
             .build()
 
@@ -332,6 +339,9 @@ class RoomDatabaseIntegrationTest {
             assertEquals(2, articles.size)
             assertTrue(articles.all { it.wikipediaPageId == null })
             assertTrue(articles.all { it.lastSyncedAt == null })
+            assertTrue(articles.all { it.contentFormat == ArticleContentFormat.PLAIN_TEXT.name })
+            assertTrue(articles.all { it.extractedFormulaCount == 0 })
+            assertTrue(articles.all { it.unextractableFormulaCount == 0 })
 
             val colIdsArt11 = migratedArticleDao.getCollectionIdsForArticle(11L).first().toSet()
             assertEquals(setOf(1L, 2L), colIdsArt11)
@@ -684,7 +694,11 @@ class RoomDatabaseIntegrationTest {
         v2Helper.close()
 
         val migratedDb = Room.databaseBuilder(context, EruditoDatabase::class.java, dbName)
-            .addMigrations(EruditoDatabase.MIGRATION_1_2, EruditoDatabase.MIGRATION_2_3)
+            .addMigrations(
+                EruditoDatabase.MIGRATION_1_2,
+                EruditoDatabase.MIGRATION_2_3,
+                EruditoDatabase.MIGRATION_3_4
+            )
             .allowMainThreadQueries()
             .build()
 
@@ -700,6 +714,9 @@ class RoomDatabaseIntegrationTest {
             val articles = migratedArticleDao.getAllArticles().first()
             assertEquals(2, articles.size)
             assertTrue(articles.all { it.lastSyncedAt == null })
+            assertTrue(articles.all { it.contentFormat == ArticleContentFormat.PLAIN_TEXT.name })
+            assertTrue(articles.all { it.extractedFormulaCount == 0 })
+            assertTrue(articles.all { it.unextractableFormulaCount == 0 })
 
             val curated = migratedArticleDao.getArticleById(10L)
             assertNotNull(curated)
@@ -767,5 +784,184 @@ class RoomDatabaseIntegrationTest {
         assertEquals(9000L, updated.lastUpdated)
         assertEquals(9000L, updated.lastSyncedAt)
         assertEquals(setOf(col1Id, col2Id), articleDao.getCollectionIdsForArticle(articleId).first().toSet())
+    }
+
+    @Test
+    fun migration3To4PreservesArticlesCrossRefsAndInitializesFormatAndFormulaCounts() = runTest {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val dbName = "migration_3_4_test_${System.nanoTime()}.db"
+        context.deleteDatabase(dbName)
+
+        val v3Helper = object : SQLiteOpenHelper(context, dbName, null, 3) {
+            override fun onCreate(db: SQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `collections` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `name` TEXT NOT NULL,
+                        `createdAt` INTEGER NOT NULL
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `articles` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `title` TEXT NOT NULL,
+                        `url` TEXT NOT NULL,
+                        `description` TEXT,
+                        `content` TEXT,
+                        `imageUrl` TEXT,
+                        `lastUpdated` INTEGER NOT NULL,
+                        `wikipediaPageId` INTEGER,
+                        `lastSyncedAt` INTEGER
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS `index_articles_wikipediaPageId` ON `articles` (`wikipediaPageId`)"
+                )
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `collection_article_cross_ref` (
+                        `collectionId` INTEGER NOT NULL,
+                        `articleId` INTEGER NOT NULL,
+                        PRIMARY KEY(`collectionId`, `articleId`),
+                        FOREIGN KEY(`collectionId`) REFERENCES `collections`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE,
+                        FOREIGN KEY(`articleId`) REFERENCES `articles`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_collection_article_cross_ref_collectionId` ON `collection_article_cross_ref` (`collectionId`)"
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_collection_article_cross_ref_articleId` ON `collection_article_cross_ref` (`articleId`)"
+                )
+
+                db.execSQL("INSERT INTO collections (id, name, createdAt) VALUES (1, 'Matemática', 1000)")
+                db.execSQL("INSERT INTO collections (id, name, createdAt) VALUES (2, 'Física', 2000)")
+                db.execSQL(
+                    """
+                    INSERT INTO articles (id, title, url, description, content, imageUrl, lastUpdated, wikipediaPageId, lastSyncedAt)
+                    VALUES (10, 'Filosofia Grega', 'https://pt.wikipedia.org/wiki/Filosofia_grega', 'Curadoria', 'Texto curado', NULL, 3000, NULL, NULL)
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    """
+                    INSERT INTO articles (id, title, url, description, content, imageUrl, lastUpdated, wikipediaPageId, lastSyncedAt)
+                    VALUES (20, 'Equação diferencial', 'https://pt.wikipedia.org/wiki/Equa%C3%A7%C3%A3o_diferencial', 'Equação matemática', 'Texto legado em texto simples', 'https://upload.wikimedia.org/eq.png', 4000, 6321, 4500)
+                    """.trimIndent()
+                )
+                db.execSQL("INSERT INTO collection_article_cross_ref (collectionId, articleId) VALUES (1, 10)")
+                db.execSQL("INSERT INTO collection_article_cross_ref (collectionId, articleId) VALUES (1, 20)")
+                db.execSQL("INSERT INTO collection_article_cross_ref (collectionId, articleId) VALUES (2, 20)")
+            }
+
+            override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) = Unit
+        }
+
+        v3Helper.writableDatabase.close()
+        v3Helper.close()
+
+        val migratedDb = Room.databaseBuilder(context, EruditoDatabase::class.java, dbName)
+            .addMigrations(
+                EruditoDatabase.MIGRATION_1_2,
+                EruditoDatabase.MIGRATION_2_3,
+                EruditoDatabase.MIGRATION_3_4
+            )
+            .allowMainThreadQueries()
+            .build()
+
+        try {
+            val migratedCollectionDao = migratedDb.collectionDao()
+            val migratedArticleDao = migratedDb.articleDao()
+
+            val collections = migratedCollectionDao.getAllCollectionsWithCount().first()
+            assertEquals(2, collections.size)
+            assertEquals(2, collections.first { it.collection.id == 1L }.articleCount)
+            assertEquals(1, collections.first { it.collection.id == 2L }.articleCount)
+
+            val curated = migratedArticleDao.getArticleById(10L)!!
+            assertNull(curated.wikipediaPageId)
+            assertNull(curated.lastSyncedAt)
+            assertEquals("PLAIN_TEXT", curated.contentFormat)
+            assertEquals(0, curated.extractedFormulaCount)
+            assertEquals(0, curated.unextractableFormulaCount)
+
+            val legacyWiki = migratedArticleDao.getArticleById(20L)!!
+            assertEquals(6321L, legacyWiki.wikipediaPageId)
+            assertEquals(4500L, legacyWiki.lastSyncedAt)
+            assertEquals("Texto legado em texto simples", legacyWiki.content)
+            assertEquals("PLAIN_TEXT", legacyWiki.contentFormat)
+            assertEquals(0, legacyWiki.extractedFormulaCount)
+            assertEquals(0, legacyWiki.unextractableFormulaCount)
+            assertEquals(setOf(1L, 2L), migratedArticleDao.getCollectionIdsForArticle(20L).first().toSet())
+
+            // Após migração, o banco aceita atualização para STRUCTURED_HTML e contadores de fórmulas
+            migratedArticleDao.updateArticle(
+                legacyWiki.copy(
+                    content = """<p>Equação: <span class="erudito-math-inline" data-tex="y' = x"></span></p>""",
+                    contentFormat = ArticleContentFormat.STRUCTURED_HTML.name,
+                    extractedFormulaCount = 1,
+                    unextractableFormulaCount = 0,
+                    lastUpdated = 9000L,
+                    lastSyncedAt = 9000L
+                )
+            )
+            val upgraded = migratedArticleDao.getArticleById(20L)!!
+            assertEquals(ArticleContentFormat.STRUCTURED_HTML.name, upgraded.contentFormat)
+            assertEquals(1, upgraded.extractedFormulaCount)
+            assertEquals(0, upgraded.unextractableFormulaCount)
+            assertEquals(setOf(1L, 2L), migratedArticleDao.getCollectionIdsForArticle(20L).first().toSet())
+        } finally {
+            migratedDb.close()
+            context.deleteDatabase(dbName)
+        }
+    }
+
+    @Test
+    fun structuredHtmlAndFormulaCountsPersistAndReloadFaithfullyThroughRepository() = runTest {
+        val repository = ArticleRepositoryImpl(articleDao)
+        val colId = collectionDao.insertCollection(CollectionEntity(name = "Cálculo"))
+
+        val structuredHtml = """<section><p>Derivada <span class="erudito-math-inline" data-tex="f'(x)"></span></p></section>"""
+        val savedId = repository.saveArticleAndAssociateCollections(
+            article = Article(
+                title = "Derivada",
+                url = "https://pt.wikipedia.org/wiki/Derivada",
+                description = "Taxa de variação instantânea",
+                content = structuredHtml,
+                imageUrl = "https://upload.wikimedia.org/derivada.png",
+                lastUpdated = 12345L,
+                wikipediaPageId = 888L,
+                lastSyncedAt = 12345L,
+                contentFormat = ArticleContentFormat.STRUCTURED_HTML,
+                extractedFormulaCount = 12,
+                unextractableFormulaCount = 2
+            ),
+            collectionIds = listOf(colId)
+        )
+
+        val reloaded = repository.getArticleById(savedId)!!
+        assertEquals(structuredHtml, reloaded.content)
+        assertEquals(ArticleContentFormat.STRUCTURED_HTML, reloaded.contentFormat)
+        assertEquals(12, reloaded.extractedFormulaCount)
+        assertEquals(2, reloaded.unextractableFormulaCount)
+        assertTrue(reloaded.hasUnextractableFormulas)
+
+        val plainId = repository.insertArticle(
+            Article(
+                title = "Artigo Simples",
+                url = "https://pt.wikipedia.org/wiki/Artigo_Simples",
+                content = "Texto simples",
+                wikipediaPageId = 889L
+            )
+        )
+        val reloadedPlain = repository.getArticleById(plainId)!!
+        assertEquals(ArticleContentFormat.PLAIN_TEXT, reloadedPlain.contentFormat)
+        assertEquals(0, reloadedPlain.extractedFormulaCount)
+        assertEquals(0, reloadedPlain.unextractableFormulaCount)
+        assertTrue(reloadedPlain.isContentIntegrityComplete)
     }
 }

@@ -31,4 +31,14 @@ sealed class WikipediaException(
         message: String = "Não foi possível interpretar a resposta da Wikipédia.",
         cause: Throwable? = null
     ) : WikipediaException(message, cause)
+
+    class EmptyContent(
+        message: String = "A Wikipédia retornou conteúdo vazio para este artigo.",
+        cause: Throwable? = null
+    ) : WikipediaException(message, cause)
+
+    class SanitizationError(
+        message: String = "Não foi possível processar com segurança o conteúdo do artigo.",
+        cause: Throwable? = null
+    ) : WikipediaException(message, cause)
 }

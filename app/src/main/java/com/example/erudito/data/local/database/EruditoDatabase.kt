@@ -24,7 +24,7 @@ import kotlinx.coroutines.launch
         ArticleEntity::class,
         CollectionArticleCrossRef::class
     ],
-    version = 3,
+    version = 4,
     exportSchema = false
 )
 abstract class EruditoDatabase : RoomDatabase() {
@@ -65,6 +65,20 @@ abstract class EruditoDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_3_4: Migration = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "ALTER TABLE articles ADD COLUMN contentFormat TEXT NOT NULL DEFAULT 'PLAIN_TEXT'"
+                )
+                db.execSQL(
+                    "ALTER TABLE articles ADD COLUMN extractedFormulaCount INTEGER NOT NULL DEFAULT 0"
+                )
+                db.execSQL(
+                    "ALTER TABLE articles ADD COLUMN unextractableFormulaCount INTEGER NOT NULL DEFAULT 0"
+                )
+            }
+        }
+
         fun getInstance(context: Context): EruditoDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -72,7 +86,7 @@ abstract class EruditoDatabase : RoomDatabase() {
                     EruditoDatabase::class.java,
                     "erudito_database.db"
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
                     .addCallback(DatabaseCallback())
                     .build()
                 INSTANCE = instance

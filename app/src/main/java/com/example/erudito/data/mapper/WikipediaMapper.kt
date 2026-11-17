@@ -2,7 +2,9 @@ package com.example.erudito.data.mapper
 
 import com.example.erudito.data.remote.dto.WikipediaApiResponseDto
 import com.example.erudito.data.remote.dto.WikipediaPageDto
+import com.example.erudito.data.remote.parser.SanitizedWikipediaHtml
 import com.example.erudito.domain.model.Article
+import com.example.erudito.domain.model.ArticleContentFormat
 import com.example.erudito.domain.model.WikipediaArticle
 import com.example.erudito.domain.model.WikipediaSearchResult
 import java.net.URLEncoder
@@ -60,7 +62,34 @@ fun WikipediaPageDto.toWikipediaArticleOrNull(): WikipediaArticle? {
         content = safeContent,
         imageUrl = safeImageUrl,
         url = safeUrl,
-        hasExtractedContent = extractedContent != null
+        hasExtractedContent = extractedContent != null,
+        contentFormat = ArticleContentFormat.PLAIN_TEXT
+    )
+}
+
+fun WikipediaPageDto.toStructuredWikipediaArticleOrNull(
+    sanitizedHtml: SanitizedWikipediaHtml
+): WikipediaArticle? {
+    if (missing == true) return null
+    val id = pageId?.takeIf { it > 0L } ?: return null
+    val safeTitle = title?.trim()?.takeIf { it.isNotEmpty() } ?: return null
+    val safeHtml = sanitizedHtml.html.trim().takeIf { it.isNotEmpty() } ?: return null
+    val safeDescription = description?.trim()?.takeIf { it.isNotEmpty() }
+    val safeImageUrl = (original?.source ?: thumbnail?.source)?.trim()?.takeIf { it.isNotEmpty() }
+    val safeUrl = (fullUrl ?: canonicalUrl)?.trim()?.takeIf { it.isNotEmpty() }
+        ?: buildWikipediaArticleUrl(safeTitle)
+
+    return WikipediaArticle(
+        pageId = id,
+        title = safeTitle,
+        description = safeDescription,
+        content = safeHtml,
+        imageUrl = safeImageUrl,
+        url = safeUrl,
+        hasExtractedContent = true,
+        contentFormat = ArticleContentFormat.STRUCTURED_HTML,
+        extractedFormulaCount = sanitizedHtml.extractedFormulaCount,
+        unextractableFormulaCount = sanitizedHtml.unextractableFormulaCount
     )
 }
 
@@ -77,7 +106,10 @@ fun WikipediaArticle.toDomainArticle(
         imageUrl = imageUrl,
         lastUpdated = lastUpdated,
         wikipediaPageId = pageId,
-        lastSyncedAt = lastSyncedAt
+        lastSyncedAt = lastSyncedAt,
+        contentFormat = contentFormat,
+        extractedFormulaCount = extractedFormulaCount.coerceAtLeast(0),
+        unextractableFormulaCount = unextractableFormulaCount.coerceAtLeast(0)
     )
 }
 
@@ -90,7 +122,10 @@ fun Article.toWikipediaArticle(fallbackPageId: Long = 0L): WikipediaArticle {
         content = localExtracted ?: description ?: "",
         imageUrl = imageUrl,
         url = url,
-        hasExtractedContent = localExtracted != null
+        hasExtractedContent = localExtracted != null,
+        contentFormat = if (localExtracted != null) contentFormat else ArticleContentFormat.PLAIN_TEXT,
+        extractedFormulaCount = if (localExtracted != null) extractedFormulaCount.coerceAtLeast(0) else 0,
+        unextractableFormulaCount = if (localExtracted != null) unextractableFormulaCount.coerceAtLeast(0) else 0
     )
 }
 

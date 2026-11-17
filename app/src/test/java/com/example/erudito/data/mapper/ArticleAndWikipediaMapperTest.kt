@@ -1,8 +1,11 @@
 package com.example.erudito.data.mapper
 
 import com.example.erudito.data.local.entity.ArticleEntity
+import com.example.erudito.data.remote.dto.WikipediaImageDto
 import com.example.erudito.data.remote.dto.WikipediaPageDto
+import com.example.erudito.data.remote.parser.SanitizedWikipediaHtml
 import com.example.erudito.domain.model.Article
+import com.example.erudito.domain.model.ArticleContentFormat
 import com.example.erudito.domain.model.WikipediaArticle
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -137,5 +140,135 @@ class ArticleAndWikipediaMapperTest {
 
         assertFalse(withBlankExtractFallback.hasExtractedContent)
         assertEquals("Filósofo pré-socrático", withBlankExtractFallback.content)
+        assertEquals(ArticleContentFormat.PLAIN_TEXT, withBlankExtractFallback.contentFormat)
+    }
+
+    @Test
+    fun `pageDto toStructuredWikipediaArticleOrNull maps sanitized HTML with metadata and formula counts`() {
+        val pageDto = WikipediaPageDto(
+            pageId = 6321L,
+            title = "Equação diferencial",
+            description = "Equação envolvendo derivadas",
+            original = WikipediaImageDto("https://upload.wikimedia.org/eq_orig.png"),
+            thumbnail = WikipediaImageDto("https://upload.wikimedia.org/eq_thumb.png"),
+            fullUrl = "https://pt.wikipedia.org/wiki/Equa%C3%A7%C3%A3o_diferencial"
+        )
+        val sanitized = SanitizedWikipediaHtml(
+            html = """<p>Exemplo <span class="erudito-math-inline" data-tex="y' = x"></span></p>""",
+            extractedFormulaCount = 1,
+            unextractableFormulaCount = 0
+        )
+
+        val mapped = pageDto.toStructuredWikipediaArticleOrNull(sanitized)!!
+
+        assertEquals(6321L, mapped.pageId)
+        assertEquals("Equação diferencial", mapped.title)
+        assertEquals("Equação envolvendo derivadas", mapped.description)
+        assertEquals(sanitized.html, mapped.content)
+        assertEquals("https://upload.wikimedia.org/eq_orig.png", mapped.imageUrl)
+        assertEquals("https://pt.wikipedia.org/wiki/Equa%C3%A7%C3%A3o_diferencial", mapped.url)
+        assertTrue(mapped.hasExtractedContent)
+        assertEquals(ArticleContentFormat.STRUCTURED_HTML, mapped.contentFormat)
+        assertEquals(1, mapped.extractedFormulaCount)
+        assertEquals(0, mapped.unextractableFormulaCount)
+        assertFalse(mapped.hasUnextractableFormulas)
+        assertTrue(mapped.isContentIntegrityComplete)
+
+        val domainArticle = mapped.toDomainArticle(lastUpdated = 123456L, lastSyncedAt = 123456L)
+        assertEquals(ArticleContentFormat.STRUCTURED_HTML, domainArticle.contentFormat)
+        assertEquals(sanitized.html, domainArticle.content)
+        assertEquals(1, domainArticle.extractedFormulaCount)
+        assertEquals(0, domainArticle.unextractableFormulaCount)
+        assertTrue(domainArticle.isStructuredHtmlComplete)
+
+        val entity = domainArticle.toEntity()
+        assertEquals(ArticleContentFormat.STRUCTURED_HTML.name, entity.contentFormat)
+        assertEquals(1, entity.extractedFormulaCount)
+        assertEquals(0, entity.unextractableFormulaCount)
+
+        val reloadedDomain = entity.toDomain()
+        assertEquals(ArticleContentFormat.STRUCTURED_HTML, reloadedDomain.contentFormat)
+        assertEquals(1, reloadedDomain.extractedFormulaCount)
+        assertEquals(0, reloadedDomain.unextractableFormulaCount)
+        assertTrue(reloadedDomain.isStructuredHtmlComplete)
+
+        val roundTripped = reloadedDomain.toWikipediaArticle()
+        assertEquals(ArticleContentFormat.STRUCTURED_HTML, roundTripped.contentFormat)
+        assertEquals(1, roundTripped.extractedFormulaCount)
+        assertEquals(0, roundTripped.unextractableFormulaCount)
+        assertTrue(roundTripped.hasExtractedContent)
+        assertTrue(roundTripped.isContentIntegrityComplete)
+    }
+
+    @Test
+    fun `toStructuredWikipediaArticleOrNull marks incomplete integrity when unextractable formulas exist`() {
+        val pageDto = WikipediaPageDto(
+            pageId = 1210L,
+            title = "Matemática",
+            fullUrl = "https://pt.wikipedia.org/wiki/Matem%C3%A1tica"
+        )
+        val sanitized = SanitizedWikipediaHtml(
+            html = """<p>Texto <span class="erudito-math-unavailable" data-math-status="unavailable">[Fórmula indisponível]</span></p>""",
+            extractedFormulaCount = 4,
+            unextractableFormulaCount = 1
+        )
+
+        val mapped = pageDto.toStructuredWikipediaArticleOrNull(sanitized)!!
+
+        assertEquals(ArticleContentFormat.STRUCTURED_HTML, mapped.contentFormat)
+        assertEquals(4, mapped.extractedFormulaCount)
+        assertEquals(1, mapped.unextractableFormulaCount)
+        assertTrue(mapped.hasUnextractableFormulas)
+        assertFalse(mapped.isContentIntegrityComplete)
+
+        val domain = mapped.toDomainArticle()
+        val roundTripped = domain.toEntity().toDomain()
+        assertEquals(ArticleContentFormat.STRUCTURED_HTML, roundTripped.contentFormat)
+        assertEquals(4, roundTripped.extractedFormulaCount)
+        assertEquals(1, roundTripped.unextractableFormulaCount)
+        assertTrue(roundTripped.hasUnextractableFormulas)
+        assertFalse(roundTripped.isContentIntegrityComplete)
+        assertFalse(roundTripped.isStructuredHtmlComplete)
+    }
+
+    @Test
+    fun `articleEntity toDomain falls back safely to PLAIN_TEXT on unknown contentFormat and clamps negative counts`() {
+        val entity = ArticleEntity(
+            id = 50L,
+            title = "Legado",
+            url = "https://pt.wikipedia.org/wiki/Legado",
+            description = "Desc",
+            content = "Texto simples",
+            imageUrl = null,
+            lastUpdated = 1000L,
+            contentFormat = "UNKNOWN_LEGACY_FORMAT",
+            extractedFormulaCount = -3,
+            unextractableFormulaCount = -1
+        )
+
+        val domain = entity.toDomain()
+
+        assertEquals(ArticleContentFormat.PLAIN_TEXT, domain.contentFormat)
+        assertEquals(0, domain.extractedFormulaCount)
+        assertEquals(0, domain.unextractableFormulaCount)
+        assertTrue(domain.isContentIntegrityComplete)
+        assertFalse(domain.isStructuredHtmlComplete)
+    }
+
+    @Test
+    fun `toStructuredWikipediaArticleOrNull returns null for missing page or blank sanitized HTML`() {
+        val missingPage = WikipediaPageDto(pageId = 10L, title = "Inexistente", missing = true)
+        assertNull(
+            missingPage.toStructuredWikipediaArticleOrNull(
+                SanitizedWikipediaHtml("<p>Texto</p>", 0, 0)
+            )
+        )
+
+        val validPage = WikipediaPageDto(pageId = 10L, title = "Vazio")
+        assertNull(
+            validPage.toStructuredWikipediaArticleOrNull(
+                SanitizedWikipediaHtml("   ", 0, 0)
+            )
+        )
     }
 }
