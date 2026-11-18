@@ -63,6 +63,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
+import com.example.erudito.domain.html.StructuredArticleHtmlProcessor
 import com.example.erudito.presentation.components.ArticleBodyContent
 import com.example.erudito.presentation.components.CollectionPickerDialog
 import com.example.erudito.presentation.components.EmptyStateView
@@ -101,6 +102,7 @@ fun WikipediaArticleScreen(
         onConfirmCollectionSelection = { viewModel.confirmCollectionSelection() },
         onRefreshSavedCopy = { viewModel.refreshSavedCopy() },
         feedbackEvents = viewModel.feedbackEvents,
+        htmlProcessor = viewModel.htmlProcessor,
         modifier = modifier
     )
 }
@@ -122,7 +124,8 @@ fun WikipediaArticleScreenContent(
     onCreateCollection: (String) -> Unit = {},
     onConfirmCollectionSelection: () -> Unit = {},
     onRefreshSavedCopy: () -> Unit = {},
-    feedbackEvents: Flow<String> = emptyFlow()
+    feedbackEvents: Flow<String> = emptyFlow(),
+    htmlProcessor: StructuredArticleHtmlProcessor? = null
 ) {
     val scrollState = rememberScrollState()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -515,7 +518,8 @@ fun WikipediaArticleScreenContent(
                                 unextractableFormulaCount = article.unextractableFormulaCount,
                                 onOpenLink = onOpenOriginalUrl,
                                 testTag = "wikipedia_article_content",
-                                emptyContentText = "Este artigo não possui conteúdo textual disponível para exibição."
+                                emptyContentText = "Este artigo não possui conteúdo textual disponível para exibição.",
+                                htmlProcessor = htmlProcessor
                             )
 
                             Spacer(modifier = Modifier.height(28.dp))

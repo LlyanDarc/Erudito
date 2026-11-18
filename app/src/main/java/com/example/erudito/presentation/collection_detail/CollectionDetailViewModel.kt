@@ -94,6 +94,9 @@ class CollectionDetailViewModel @Inject constructor(
                 renameCollectionUseCase(collectionId, newName)
                 _uiState.update { it.copy(isRenameDialogOpen = false) }
                 _feedbackEvents.send("Coleção renomeada para \"$trimmedName\"!")
+            } catch (e: CancellationException) {
+                _uiState.update { it.copy(isRenameDialogOpen = false) }
+                throw e
             } catch (e: Exception) {
                 _uiState.update {
                     it.copy(
@@ -119,6 +122,9 @@ class CollectionDetailViewModel @Inject constructor(
                         errorMessage = null
                     )
                 }
+            } catch (e: CancellationException) {
+                _uiState.update { it.copy(isDeleting = false, isDeleteDialogOpen = false) }
+                throw e
             } catch (e: Exception) {
                 _uiState.update {
                     it.copy(
@@ -160,6 +166,7 @@ class CollectionDetailViewModel @Inject constructor(
                 _uiState.update { it.copy(isRemovingArticle = false) }
                 _feedbackEvents.send("Artigo \"${article.title}\" removido da coleção.")
             } catch (e: CancellationException) {
+                _uiState.update { it.copy(isRemovingArticle = false) }
                 throw e
             } catch (e: Exception) {
                 _uiState.update {

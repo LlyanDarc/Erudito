@@ -14,6 +14,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import androidx.lifecycle.SavedStateHandle
+import com.example.erudito.data.remote.parser.WikipediaHtmlSanitizer
 import com.example.erudito.domain.connectivity.ConnectivityObserver
 import com.example.erudito.domain.connectivity.FakeConnectivityObserver
 import com.example.erudito.domain.model.Article
@@ -87,7 +88,8 @@ class WikipediaArticleScreenTest {
                 connectivityObserver = connectivityObserver,
                 syncPolicy = SyncPolicy()
             ),
-            connectivityObserver = connectivityObserver
+            connectivityObserver = connectivityObserver,
+            htmlProcessor = WikipediaHtmlSanitizer()
         )
     }
 

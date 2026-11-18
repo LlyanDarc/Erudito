@@ -1,6 +1,7 @@
 package com.example.erudito.presentation.article_detail
 
 import androidx.lifecycle.SavedStateHandle
+import com.example.erudito.data.remote.parser.WikipediaHtmlSanitizer
 import com.example.erudito.domain.connectivity.FakeConnectivityObserver
 import com.example.erudito.domain.model.Article
 import com.example.erudito.domain.model.WikipediaArticle
@@ -75,7 +76,8 @@ class ArticleDetailViewModelTest {
                 connectivityObserver = connectivityObserver,
                 syncPolicy = SyncPolicy()
             ),
-            connectivityObserver = connectivityObserver
+            connectivityObserver = connectivityObserver,
+            htmlProcessor = WikipediaHtmlSanitizer()
         )
     }
 

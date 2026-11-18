@@ -135,4 +135,50 @@ class AndroidConnectivityObserverTest {
         job.cancel()
         assertTrue(shadowOf(connectivityManager).networkCallbacks.isEmpty())
     }
+
+    @Test
+    fun `isOnline shares a single NetworkCallback across concurrent collectors and releases only when last stops`() = runTest {
+        val activeNetwork = connectivityManager.activeNetwork!!
+        val onlineCaps = buildCapabilities(hasInternet = true, isValidated = true)
+        val offlineCaps = buildCapabilities(hasInternet = true, isValidated = false)
+        shadowOf(connectivityManager).setNetworkCapabilities(activeNetwork, onlineCaps)
+
+        val emissions1 = mutableListOf<Boolean>()
+        val emissions2 = mutableListOf<Boolean>()
+        val job1 = launch(UnconfinedTestDispatcher(testScheduler)) {
+            observer.isOnline.collect { emissions1.add(it) }
+        }
+        val job2 = launch(UnconfinedTestDispatcher(testScheduler)) {
+            observer.isOnline.collect { emissions2.add(it) }
+        }
+
+        // Apenas um NetworkCallback deve estar registrado mesmo com 2 coletores ativos
+        assertEquals(1, shadowOf(connectivityManager).networkCallbacks.size)
+        val callback = shadowOf(connectivityManager).networkCallbacks.first()
+
+        // Ambos os coletores recebem mudança de estado
+        callback.onCapabilitiesChanged(activeNetwork, offlineCaps)
+        assertEquals(listOf(true, false), emissions1)
+        assertEquals(listOf(true, false), emissions2)
+
+        // Cancelar um coletor mantém o callback compartilhado ativo para o segundo coletor
+        job1.cancel()
+        assertEquals(1, shadowOf(connectivityManager).networkCallbacks.size)
+
+        callback.onCapabilitiesChanged(activeNetwork, onlineCaps)
+        assertEquals(listOf(true, false), emissions1)
+        assertEquals(listOf(true, false, true), emissions2)
+
+        // Cancelar o último coletor libera o NetworkCallback
+        job2.cancel()
+        assertEquals(0, shadowOf(connectivityManager).networkCallbacks.size)
+
+        // Nova assinatura após chegar a zero coletores registra novamente um único callback
+        val job3 = launch(UnconfinedTestDispatcher(testScheduler)) {
+            observer.isOnline.collect()
+        }
+        assertEquals(1, shadowOf(connectivityManager).networkCallbacks.size)
+        job3.cancel()
+        assertEquals(0, shadowOf(connectivityManager).networkCallbacks.size)
+    }
 }

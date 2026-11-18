@@ -33,11 +33,12 @@ class FakeCollectionRepository : CollectionRepository {
 
     override suspend fun renameCollection(id: Long, newName: String) {
         val index = collections.indexOfFirst { it.id == id }
-        if (index != -1) {
-            val updated = collections[index].copy(name = newName)
-            collections[index] = updated
-            collectionsFlow.value = collections.toList()
+        if (index == -1) {
+            throw NoSuchElementException("Coleção não encontrada.")
         }
+        val updated = collections[index].copy(name = newName)
+        collections[index] = updated
+        collectionsFlow.value = collections.toList()
     }
 
     override suspend fun deleteCollection(id: Long) {

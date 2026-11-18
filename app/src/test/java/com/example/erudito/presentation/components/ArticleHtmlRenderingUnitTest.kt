@@ -69,7 +69,8 @@ class ArticleHtmlRenderingUnitTest {
     }
 
     @Test
-    fun `sanitizeFragmentDefensively strips executable tags event handlers and javascript URLs`() {
+    fun `sanitizeForDisplay strips executable tags event handlers http images and javascript URLs`() {
+        val processor = com.example.erudito.data.remote.parser.WikipediaHtmlSanitizer()
         val maliciousFragment = """
             <p onclick="alert(1)">Texto legítimo</p>
             <script>window.evil = true;</script>
@@ -81,18 +82,23 @@ class ArticleHtmlRenderingUnitTest {
             <span class="erudito-math-inline" data-tex="x \in \Z" onmouseover="hack()"></span>
         """.trimIndent()
 
-        val cleaned = ArticleHtmlDocumentBuilder.sanitizeFragmentDefensively(maliciousFragment)
+        val cleaned = processor.sanitizeForDisplay(maliciousFragment)
         val parsed = Jsoup.parseBodyFragment(cleaned)
+        val docHtml = ArticleHtmlDocumentBuilder.buildDocument(cleaned, isDarkTheme = false)
+        val parsedDoc = Jsoup.parse(docHtml)
 
         assertTrue(parsed.select("script, iframe").isEmpty())
+        assertTrue(parsedDoc.select("main.erudito-content script, iframe").isEmpty())
         assertFalse(cleaned.contains("onclick"))
         assertFalse(cleaned.contains("onmouseover"))
         assertFalse(cleaned.contains("javascript:"))
         assertEquals(1, parsed.select("a").size)
         assertEquals("https://pt.wikipedia.org/wiki/F%C3%ADsica", parsed.selectFirst("a")?.attr("href"))
+        assertEquals("noopener noreferrer", parsed.selectFirst("a")?.attr("rel"))
         assertEquals(1, parsed.select("img").size)
         assertEquals("https://upload.wikimedia.org/b.png", parsed.selectFirst("img")?.attr("src"))
         assertEquals("x \\in \\Z", parsed.selectFirst(".erudito-math-inline")?.attr("data-tex"))
+        assertTrue(processor.extractPlainText(cleaned).contains("Texto legítimo"))
     }
 
     @Test

@@ -1,6 +1,6 @@
 package com.example.erudito.domain.usecase
 
-import com.example.erudito.data.mapper.toDomainArticle
+import com.example.erudito.domain.mapper.toDomainArticle
 import com.example.erudito.domain.model.WikipediaArticle
 import com.example.erudito.domain.repository.ArticleRepository
 import com.example.erudito.domain.repository.CollectionRepository

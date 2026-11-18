@@ -12,6 +12,7 @@ import com.example.erudito.data.repository.ArticleRepositoryImpl
 import com.example.erudito.data.repository.CollectionRepositoryImpl
 import com.example.erudito.data.repository.WikipediaRepositoryImpl
 import com.example.erudito.domain.connectivity.ConnectivityObserver
+import com.example.erudito.domain.html.StructuredArticleHtmlProcessor
 import com.example.erudito.domain.repository.ArticleRepository
 import com.example.erudito.domain.repository.CollectionRepository
 import com.example.erudito.domain.repository.WikipediaRepository
@@ -201,6 +202,14 @@ object EruditoHiltModule {
     @Singleton
     fun provideWikipediaHtmlSanitizer(moshi: Moshi): WikipediaHtmlSanitizer {
         return WikipediaHtmlSanitizer(moshi)
+    }
+
+    @Provides
+    @Singleton
+    fun provideStructuredArticleHtmlProcessor(
+        htmlSanitizer: WikipediaHtmlSanitizer
+    ): StructuredArticleHtmlProcessor {
+        return htmlSanitizer
     }
 
     @Provides

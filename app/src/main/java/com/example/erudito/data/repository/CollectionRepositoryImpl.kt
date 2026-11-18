@@ -37,9 +37,8 @@ class CollectionRepositoryImpl @Inject constructor(
 
     override suspend fun renameCollection(id: Long, newName: String) {
         val existing = collectionDao.getCollectionById(id)
-        if (existing != null) {
-            collectionDao.updateCollection(existing.copy(name = newName))
-        }
+            ?: throw NoSuchElementException("Coleção não encontrada.")
+        collectionDao.updateCollection(existing.copy(name = newName))
     }
 
     override suspend fun deleteCollection(id: Long) {

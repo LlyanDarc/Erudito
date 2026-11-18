@@ -10,8 +10,11 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToIndex
 import com.example.erudito.domain.connectivity.FakeConnectivityObserver
+import com.example.erudito.domain.model.Collection
+import com.example.erudito.domain.model.CollectionWithArticles
 import com.example.erudito.domain.model.WikipediaArticle
 import com.example.erudito.domain.model.WikipediaSearchResult
+import com.example.erudito.domain.repository.CollectionRepository
 import com.example.erudito.domain.repository.FakeArticleRepository
 import com.example.erudito.domain.repository.FakeCollectionRepository
 import com.example.erudito.domain.repository.WikipediaRepository
@@ -25,14 +28,18 @@ import com.example.erudito.domain.usecase.RenameCollectionUseCase
 import com.example.erudito.domain.usecase.SyncSavedArticlesUseCase
 import com.example.erudito.presentation.home.HomeScreen
 import com.example.erudito.presentation.home.HomeViewModel
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Rule
 import org.junit.Test
@@ -291,5 +298,79 @@ class CollectionFeedbackMessagesTest {
             ),
             connectivityObserver = connectivityObserver
         )
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun `CollectionsViewModel reports error when renaming non-existent collection id`() = runTest {
+        val dispatcher = UnconfinedTestDispatcher(testScheduler)
+        Dispatchers.setMain(dispatcher)
+        try {
+            val collectionRepo = FakeCollectionRepository()
+            val viewModel = CollectionsViewModel(
+                getCollectionsUseCase = GetCollectionsUseCase(collectionRepo),
+                createCollectionUseCase = CreateCollectionUseCase(collectionRepo),
+                renameCollectionUseCase = RenameCollectionUseCase(collectionRepo),
+                deleteCollectionUseCase = DeleteCollectionUseCase(collectionRepo)
+            )
+            val events = mutableListOf<String>()
+            val collector = launch(dispatcher) {
+                viewModel.feedbackEvents.collect { events.add(it) }
+            }
+
+            viewModel.renameCollection(id = 404L, newName = "Novo Nome")
+
+            assertEquals("Coleção não encontrada.", viewModel.uiState.value.errorMessage)
+            assertEquals(emptyList<String>(), events)
+            collector.cancel()
+        } finally {
+            Dispatchers.resetMain()
+        }
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun `CollectionsViewModel restores dialog state without error on CancellationException`() = runTest {
+        val dispatcher = UnconfinedTestDispatcher(testScheduler)
+        Dispatchers.setMain(dispatcher)
+        try {
+            val sampleCollection = Collection(id = 1L, name = "Física", articleCount = 0)
+            val cancellingRepo = object : CollectionRepository {
+                override fun getCollections(): Flow<List<Collection>> =
+                    MutableStateFlow(listOf(sampleCollection))
+                override fun getCollectionWithArticles(collectionId: Long): Flow<CollectionWithArticles?> =
+                    MutableStateFlow(null)
+                override suspend fun getCollectionById(collectionId: Long): Collection? = sampleCollection
+                override suspend fun createCollection(name: String): Long =
+                    throw CancellationException("Cancelado")
+                override suspend fun renameCollection(id: Long, newName: String): Unit =
+                    throw CancellationException("Cancelado")
+                override suspend fun deleteCollection(id: Long): Unit =
+                    throw CancellationException("Cancelado")
+            }
+            val viewModel = CollectionsViewModel(
+                getCollectionsUseCase = GetCollectionsUseCase(cancellingRepo),
+                createCollectionUseCase = CreateCollectionUseCase(cancellingRepo),
+                renameCollectionUseCase = RenameCollectionUseCase(cancellingRepo),
+                deleteCollectionUseCase = DeleteCollectionUseCase(cancellingRepo)
+            )
+
+            viewModel.openCreateDialog()
+            viewModel.createCollection("Nova")
+            assertFalse(viewModel.uiState.value.isCreateDialogOpen)
+            assertNull(viewModel.uiState.value.errorMessage)
+
+            viewModel.openRenameDialog(sampleCollection)
+            viewModel.renameCollection(1L, "Renomeada")
+            assertNull(viewModel.uiState.value.collectionToRename)
+            assertNull(viewModel.uiState.value.errorMessage)
+
+            viewModel.openDeleteDialog(sampleCollection)
+            viewModel.deleteCollection(1L)
+            assertNull(viewModel.uiState.value.collectionToDelete)
+            assertNull(viewModel.uiState.value.errorMessage)
+        } finally {
+            Dispatchers.resetMain()
+        }
     }
 }

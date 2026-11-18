@@ -1,5 +1,7 @@
 package com.example.erudito.data.remote.parser
 
+import com.example.erudito.domain.html.StructuredArticleHtmlProcessor
+
 import com.squareup.moshi.Json
 import com.squareup.moshi.JsonClass
 import com.squareup.moshi.JsonReader
@@ -23,7 +25,7 @@ data class SanitizedWikipediaHtml(
 @Singleton
 open class WikipediaHtmlSanitizer @Inject constructor(
     moshi: Moshi
-) {
+) : StructuredArticleHtmlProcessor {
     constructor() : this(Moshi.Builder().build())
 
     private val dataMwAdapter = moshi.adapter(ParsoidDataMwDto::class.java)
@@ -64,21 +66,45 @@ open class WikipediaHtmlSanitizer @Inject constructor(
         // 5. Promove <dl><dd> que contenham exclusivamente uma fórmula para bloco centralizado.
         promoteSingleFormulaDefinitionLists(document, body)
 
-        // 6. Normaliza e valida URLs de links e imagens; filtra classes permitidas.
-        sanitizeLinksAndImages(body)
-        filterAllowedClasses(body)
-
-        // 7. Aplica limpeza defensiva final via Safelist explícita (preservando data-tex e classes neutras).
-        val cleanedDocument = Cleaner(WIKIPEDIA_SAFELIST).clean(document)
-        cleanedDocument.outputSettings()
-            .prettyPrint(false)
-            .charset(StandardCharsets.UTF_8)
+        // 6. Normaliza links/imagens, filtra classes e aplica Safelist explícita.
+        val cleanedDocument = applyFinalDomSanitization(document, body)
 
         return SanitizedWikipediaHtml(
             html = cleanedDocument.body().html().trim(),
             extractedFormulaCount = extractedCount,
             unextractableFormulaCount = unextractableCount
         )
+    }
+
+    override fun sanitizeForDisplay(rawHtml: String): String {
+        if (rawHtml.isBlank()) return ""
+
+        val document = Jsoup.parseBodyFragment(rawHtml, WIKIPEDIA_WIKI_BASE_URL)
+        document.outputSettings()
+            .prettyPrint(false)
+            .charset(StandardCharsets.UTF_8)
+
+        val body = document.body()
+        body.select(EXECUTABLE_AND_EXTERNAL_TAGS_SELECTOR).remove()
+
+        val cleanedDocument = applyFinalDomSanitization(document, body)
+        return cleanedDocument.body().html().trim()
+    }
+
+    override fun extractPlainText(html: String): String {
+        if (html.isBlank()) return ""
+        return Jsoup.parseBodyFragment(html, WIKIPEDIA_WIKI_BASE_URL).text().trim()
+    }
+
+    private fun applyFinalDomSanitization(document: Document, body: Element): Document {
+        sanitizeLinksAndImages(body)
+        filterAllowedClasses(body)
+
+        val cleanedDocument = Cleaner(WIKIPEDIA_SAFELIST).clean(document)
+        cleanedDocument.outputSettings()
+            .prettyPrint(false)
+            .charset(StandardCharsets.UTF_8)
+        return cleanedDocument
     }
 
     private fun extractAndConvertMathElements(
@@ -312,7 +338,7 @@ open class WikipediaHtmlSanitizer @Inject constructor(
 
         for (image in body.select("img").toList()) {
             val resolvedSrc = image.absUrl("src").trim()
-            if (isSafeHttpUrl(resolvedSrc)) {
+            if (isSafeHttpsUrl(resolvedSrc)) {
                 image.attr("src", resolvedSrc)
             } else {
                 image.remove()
@@ -335,6 +361,11 @@ open class WikipediaHtmlSanitizer @Inject constructor(
         if (url.isBlank()) return false
         return url.startsWith("https://", ignoreCase = true) ||
             url.startsWith("http://", ignoreCase = true)
+    }
+
+    private fun isSafeHttpsUrl(url: String): Boolean {
+        if (url.isBlank()) return false
+        return url.startsWith("https://", ignoreCase = true)
     }
 
     private data class ExtractedFormula(
@@ -425,7 +456,7 @@ open class WikipediaHtmlSanitizer @Inject constructor(
             .addAttributes("a", "href", "title", "rel")
             .addProtocols("a", "href", "http", "https")
             .addAttributes("img", "src", "alt", "width", "height")
-            .addProtocols("img", "src", "http", "https")
+            .addProtocols("img", "src", "https")
             .addAttributes("th", "colspan", "rowspan", "scope")
             .addAttributes("td", "colspan", "rowspan")
             .addAttributes("ol", "start", "type")

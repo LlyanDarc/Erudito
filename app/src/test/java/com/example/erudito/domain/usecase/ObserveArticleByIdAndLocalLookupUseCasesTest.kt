@@ -1,6 +1,6 @@
 package com.example.erudito.domain.usecase
 
-import com.example.erudito.data.mapper.toWikipediaArticle
+import com.example.erudito.domain.mapper.toWikipediaArticle
 import com.example.erudito.domain.model.Article
 import com.example.erudito.domain.repository.FakeArticleRepository
 import kotlinx.coroutines.flow.first

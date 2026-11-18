@@ -3,8 +3,9 @@ package com.example.erudito.presentation.wikipedia_article
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.erudito.data.mapper.toWikipediaArticle
 import com.example.erudito.domain.connectivity.ConnectivityObserver
+import com.example.erudito.domain.html.StructuredArticleHtmlProcessor
+import com.example.erudito.domain.mapper.toWikipediaArticle
 import com.example.erudito.domain.model.Article
 import com.example.erudito.domain.model.WikipediaArticle
 import com.example.erudito.domain.model.WikipediaException
@@ -48,7 +49,8 @@ class WikipediaArticleViewModel @Inject constructor(
     private val getCollectionIdsForArticleUseCase: GetCollectionIdsForArticleUseCase,
     private val getSavedArticleByWikipediaPageIdUseCase: GetSavedArticleByWikipediaPageIdUseCase,
     private val refreshSavedArticleUseCase: RefreshSavedArticleUseCase,
-    private val connectivityObserver: ConnectivityObserver
+    private val connectivityObserver: ConnectivityObserver,
+    val htmlProcessor: StructuredArticleHtmlProcessor
 ) : ViewModel() {
 
     private val hasPageIdArg: Boolean = savedStateHandle.contains(ARG_PAGE_ID)
@@ -324,6 +326,7 @@ class WikipediaArticleViewModel @Inject constructor(
                 _collectionsUiState.update { it.copy(isCreatingCollection = false) }
                 _feedbackEvents.send("Coleção \"$trimmedName\" criada com sucesso!")
             } catch (e: CancellationException) {
+                _collectionsUiState.update { it.copy(isCreatingCollection = false) }
                 throw e
             } catch (e: Exception) {
                 val errorMsg = e.message?.takeIf { it.isNotBlank() } ?: "Erro ao criar coleção."
@@ -416,6 +419,7 @@ class WikipediaArticleViewModel @Inject constructor(
                 }
                 _feedbackEvents.send(feedbackMessage)
             } catch (e: CancellationException) {
+                _collectionsUiState.update { it.copy(isSaving = false) }
                 throw e
             } catch (e: Exception) {
                 val errorMsg = e.message?.takeIf { it.isNotBlank() } ?: SAVE_ERROR_MESSAGE

@@ -4,6 +4,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.erudito.domain.connectivity.ConnectivityObserver
+import com.example.erudito.domain.html.StructuredArticleHtmlProcessor
 import com.example.erudito.domain.model.WikipediaException
 import com.example.erudito.domain.sync.RefreshArticleOutcome
 import com.example.erudito.domain.sync.SkipReason
@@ -38,7 +39,8 @@ class ArticleDetailViewModel @Inject constructor(
     private val removeArticleFromCollectionUseCase: RemoveArticleFromCollectionUseCase,
     private val getCollectionIdsForArticleUseCase: GetCollectionIdsForArticleUseCase,
     private val refreshSavedArticleUseCase: RefreshSavedArticleUseCase,
-    private val connectivityObserver: ConnectivityObserver
+    private val connectivityObserver: ConnectivityObserver,
+    val htmlProcessor: StructuredArticleHtmlProcessor
 ) : ViewModel() {
 
     val articleId: Long = savedStateHandle.get<Long>("articleId")
@@ -221,6 +223,7 @@ class ArticleDetailViewModel @Inject constructor(
                 _uiState.update { it.copy(isCreatingCollection = false) }
                 _feedbackEvents.send("Coleção \"$trimmedName\" criada com sucesso!")
             } catch (e: CancellationException) {
+                _uiState.update { it.copy(isCreatingCollection = false) }
                 throw e
             } catch (e: Exception) {
                 val errorMsg = e.message?.takeIf { it.isNotBlank() } ?: "Erro ao criar coleção."
@@ -302,6 +305,7 @@ class ArticleDetailViewModel @Inject constructor(
                 }
                 _feedbackEvents.send(feedbackMessage)
             } catch (e: CancellationException) {
+                _uiState.update { it.copy(isSavingCollections = false) }
                 throw e
             } catch (e: Exception) {
                 val errorMsg = e.message?.takeIf { it.isNotBlank() } ?: SAVE_ERROR_MESSAGE

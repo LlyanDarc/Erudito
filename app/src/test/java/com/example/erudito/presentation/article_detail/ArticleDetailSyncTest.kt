@@ -15,6 +15,7 @@ import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import com.example.erudito.data.local.database.EruditoDatabase
 import com.example.erudito.data.local.entity.CollectionEntity
+import com.example.erudito.data.remote.parser.WikipediaHtmlSanitizer
 import com.example.erudito.data.repository.ArticleRepositoryImpl
 import com.example.erudito.data.repository.CollectionRepositoryImpl
 import com.example.erudito.domain.connectivity.FakeConnectivityObserver
@@ -92,7 +93,8 @@ class ArticleDetailSyncTest {
                 connectivityObserver = connectivityObserver,
                 syncPolicy = SyncPolicy()
             ),
-            connectivityObserver = connectivityObserver
+            connectivityObserver = connectivityObserver,
+            htmlProcessor = WikipediaHtmlSanitizer()
         )
     }
 

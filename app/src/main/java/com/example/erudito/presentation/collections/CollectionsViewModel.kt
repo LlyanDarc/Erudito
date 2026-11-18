@@ -9,6 +9,7 @@ import com.example.erudito.domain.usecase.GetCollectionsUseCase
 import com.example.erudito.domain.usecase.RenameCollectionUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -90,6 +91,9 @@ class CollectionsViewModel @Inject constructor(
                 createCollectionUseCase(name)
                 _uiState.update { it.copy(isCreateDialogOpen = false) }
                 _feedbackEvents.send("Coleção \"$trimmedName\" criada com sucesso!")
+            } catch (e: CancellationException) {
+                _uiState.update { it.copy(isCreateDialogOpen = false) }
+                throw e
             } catch (e: Exception) {
                 _uiState.update {
                     it.copy(
@@ -108,6 +112,9 @@ class CollectionsViewModel @Inject constructor(
                 renameCollectionUseCase(id, newName)
                 _uiState.update { it.copy(collectionToRename = null) }
                 _feedbackEvents.send("Coleção renomeada para \"$trimmedName\"!")
+            } catch (e: CancellationException) {
+                _uiState.update { it.copy(collectionToRename = null) }
+                throw e
             } catch (e: Exception) {
                 _uiState.update {
                     it.copy(
@@ -131,6 +138,9 @@ class CollectionsViewModel @Inject constructor(
                     "Coleção excluída com sucesso!"
                 }
                 _feedbackEvents.send(message)
+            } catch (e: CancellationException) {
+                _uiState.update { it.copy(collectionToDelete = null) }
+                throw e
             } catch (e: Exception) {
                 _uiState.update {
                     it.copy(

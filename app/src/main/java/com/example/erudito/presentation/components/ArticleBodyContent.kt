@@ -21,6 +21,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.erudito.domain.html.StructuredArticleHtmlProcessor
 import com.example.erudito.domain.model.ArticleContentFormat
 
 @Composable
@@ -31,7 +32,8 @@ fun ArticleBodyContent(
     onOpenLink: (String) -> Unit,
     testTag: String,
     emptyContentText: String,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    htmlProcessor: StructuredArticleHtmlProcessor? = null
 ) {
     Column(modifier = modifier.fillMaxWidth()) {
         if (content.isNullOrBlank()) {
@@ -95,6 +97,7 @@ fun ArticleBodyContent(
                 StructuredArticleWebView(
                     html = content,
                     onOpenLink = onOpenLink,
+                    htmlProcessor = htmlProcessor,
                     modifier = Modifier
                         .fillMaxWidth()
                         .testTag(testTag)

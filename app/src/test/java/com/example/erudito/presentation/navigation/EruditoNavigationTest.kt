@@ -19,6 +19,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
+import com.example.erudito.data.remote.parser.WikipediaHtmlSanitizer
 import com.example.erudito.domain.connectivity.ConnectivityObserver
 import com.example.erudito.domain.connectivity.FakeConnectivityObserver
 import com.example.erudito.domain.model.Article
@@ -451,7 +452,8 @@ class EruditoNavigationTest {
                         removeArticleFromCollectionUseCase = RemoveArticleFromCollectionUseCase(articleRepo),
                         getCollectionIdsForArticleUseCase = GetCollectionIdsForArticleUseCase(articleRepo),
                         refreshSavedArticleUseCase = refreshSavedArticleUseCase,
-                        connectivityObserver = connectivityObserver
+                        connectivityObserver = connectivityObserver,
+                        htmlProcessor = WikipediaHtmlSanitizer()
                     )
                 }
             },
@@ -483,7 +485,8 @@ class EruditoNavigationTest {
                         getCollectionIdsForArticleUseCase = GetCollectionIdsForArticleUseCase(articleRepo),
                         getSavedArticleByWikipediaPageIdUseCase = GetSavedArticleByWikipediaPageIdUseCase(articleRepo),
                         refreshSavedArticleUseCase = refreshSavedArticleUseCase,
-                        connectivityObserver = connectivityObserver
+                        connectivityObserver = connectivityObserver,
+                        htmlProcessor = WikipediaHtmlSanitizer()
                     )
                 }
             }

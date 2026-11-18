@@ -66,6 +66,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
+import com.example.erudito.domain.html.StructuredArticleHtmlProcessor
 import com.example.erudito.presentation.components.ArticleBodyContent
 import com.example.erudito.presentation.components.CollectionPickerDialog
 import com.example.erudito.presentation.components.EmptyStateView
@@ -104,6 +105,7 @@ fun ArticleDetailScreen(
         onCreateCollection = { viewModel.createCollection(it) },
         onConfirmCollectionSelection = { viewModel.confirmCollectionSelection() },
         feedbackEvents = viewModel.feedbackEvents,
+        htmlProcessor = viewModel.htmlProcessor,
         modifier = modifier
     )
 }
@@ -121,7 +123,8 @@ fun ArticleDetailScreenContent(
     onToggleCollectionSelection: (Long) -> Unit = {},
     onCreateCollection: (String) -> Unit = {},
     onConfirmCollectionSelection: () -> Unit = {},
-    feedbackEvents: Flow<String> = emptyFlow()
+    feedbackEvents: Flow<String> = emptyFlow(),
+    htmlProcessor: StructuredArticleHtmlProcessor? = null
 ) {
     val scrollState = rememberScrollState()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -523,7 +526,8 @@ fun ArticleDetailScreenContent(
                         unextractableFormulaCount = article.unextractableFormulaCount,
                         onOpenLink = onOpenOriginalUrl,
                         testTag = "article_detail_content",
-                        emptyContentText = "Nenhum conteúdo salvo para este artigo."
+                        emptyContentText = "Nenhum conteúdo salvo para este artigo.",
+                        htmlProcessor = htmlProcessor
                     )
 
                     Spacer(modifier = Modifier.height(28.dp))

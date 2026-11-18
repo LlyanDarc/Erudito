@@ -44,14 +44,15 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.webkit.WebViewAssetLoader
+import com.example.erudito.domain.html.StructuredArticleHtmlProcessor
 import java.io.ByteArrayInputStream
 import java.lang.ref.WeakReference
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.math.abs
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import org.jsoup.Jsoup
 
 private const val LOG_TAG = "StructuredArticleWebView"
 private val MIN_WEBVIEW_HEIGHT_DP = 180.dp
@@ -64,6 +65,11 @@ private data class PreparedArticleDocument(
     val token: String,
     val htmlDocument: String
 )
+
+internal sealed interface FallbackTextState {
+    data object Processing : FallbackTextState
+    data class Ready(val text: String) : FallbackTextState
+}
 
 private class WebViewRenderTracker(
     var loadedToken: String? = null,
@@ -171,7 +177,9 @@ fun StructuredArticleWebView(
     html: String,
     onOpenLink: (String) -> Unit,
     modifier: Modifier = Modifier,
-    isDarkTheme: Boolean = isSystemInDarkTheme()
+    isDarkTheme: Boolean = isSystemInDarkTheme(),
+    htmlProcessor: StructuredArticleHtmlProcessor? = null,
+    processingDispatcher: CoroutineDispatcher = Dispatchers.Default
 ) {
     val context = LocalContext.current
     val appContext = context.applicationContext
@@ -200,11 +208,13 @@ fun StructuredArticleWebView(
 
     val preparedDocState by produceState<PreparedArticleDocument?>(
         initialValue = null,
-        key1 = html
+        key1 = html,
+        key2 = htmlProcessor
     ) {
-        value = withContext(Dispatchers.Default) {
+        value = withContext(processingDispatcher) {
+            val safeFragment = htmlProcessor?.sanitizeForDisplay(html) ?: html
             val builtDoc = ArticleHtmlDocumentBuilder.buildDocument(
-                sanitizedHtml = html,
+                sanitizedHtml = safeFragment,
                 isDarkTheme = initialDarkTheme
             )
             PreparedArticleDocument(
@@ -218,6 +228,8 @@ fun StructuredArticleWebView(
         if (loadError) {
             StructuredArticleFallbackView(
                 html = html,
+                htmlProcessor = htmlProcessor,
+                processingDispatcher = processingDispatcher,
                 modifier = Modifier.testTag("structured_article_webview_fallback")
             )
         } else {
@@ -327,13 +339,28 @@ fun StructuredArticleWebView(
 }
 
 @Composable
-private fun StructuredArticleFallbackView(
+internal fun StructuredArticleFallbackView(
     html: String,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    htmlProcessor: StructuredArticleHtmlProcessor? = null,
+    processingDispatcher: CoroutineDispatcher = Dispatchers.Default
 ) {
-    val plainFallback = remember(html) {
-        Jsoup.parseBodyFragment(html).text().trim()
+    val fallbackState by produceState<FallbackTextState>(
+        initialValue = FallbackTextState.Processing,
+        key1 = html,
+        key2 = htmlProcessor
+    ) {
+        value = FallbackTextState.Processing
+        val extractedText = withContext(processingDispatcher) {
+            if (html.isBlank()) {
+                ""
+            } else {
+                htmlProcessor?.extractPlainText(html) ?: stripBasicHtmlWithoutJsoup(html)
+            }
+        }
+        value = FallbackTextState.Ready(extractedText)
     }
+
     Column(modifier = modifier.fillMaxWidth()) {
         Surface(
             shape = RoundedCornerShape(10.dp),
@@ -347,18 +374,49 @@ private fun StructuredArticleFallbackView(
                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)
             )
         }
-        if (plainFallback.isNotEmpty()) {
-            Spacer(modifier = Modifier.height(12.dp))
-            Text(
-                text = plainFallback,
-                style = MaterialTheme.typography.bodyLarge.copy(
-                    lineHeight = 28.sp,
-                    fontSize = 17.sp
-                ),
-                color = MaterialTheme.colorScheme.onSurface
-            )
+        when (val state = fallbackState) {
+            FallbackTextState.Processing -> {
+                Spacer(modifier = Modifier.height(12.dp))
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("structured_article_fallback_loading")
+                ) {
+                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "Preparando versão textual simplificada...",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            is FallbackTextState.Ready -> {
+                if (state.text.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        text = state.text,
+                        style = MaterialTheme.typography.bodyLarge.copy(
+                            lineHeight = 28.sp,
+                            fontSize = 17.sp
+                        ),
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.testTag("structured_article_fallback_text")
+                    )
+                }
+            }
         }
     }
+}
+
+private val BASIC_HTML_TAG_REGEX = Regex("<[^>]+>")
+private val COLLAPSE_WHITESPACE_REGEX = Regex("\\s+")
+
+private fun stripBasicHtmlWithoutJsoup(html: String): String {
+    return BASIC_HTML_TAG_REGEX.replace(html, " ")
+        .let { COLLAPSE_WHITESPACE_REGEX.replace(it, " ") }
+        .trim()
 }
 
 @SuppressLint("SetJavaScriptEnabled")

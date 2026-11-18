@@ -263,6 +263,8 @@ class HomeViewModel @Inject constructor(
                 val trimmedName = name.trim()
                 createCollectionUseCase(name)
                 _feedbackEvents.send("Coleção \"$trimmedName\" criada com sucesso!")
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 _uiState.update { it.copy(error = e.message ?: "Erro ao criar coleção") }
             }
@@ -275,6 +277,8 @@ class HomeViewModel @Inject constructor(
                 val trimmedName = newName.trim()
                 renameCollectionUseCase(id, newName)
                 _feedbackEvents.send("Coleção renomeada para \"$trimmedName\"!")
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 _uiState.update { it.copy(error = e.message ?: "Erro ao renomear coleção") }
             }
@@ -292,6 +296,8 @@ class HomeViewModel @Inject constructor(
                     "Coleção excluída com sucesso!"
                 }
                 _feedbackEvents.send(message)
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 _uiState.update { it.copy(error = e.message ?: "Erro ao excluir coleção") }
             }

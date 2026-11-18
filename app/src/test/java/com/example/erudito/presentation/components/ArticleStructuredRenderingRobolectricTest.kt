@@ -378,6 +378,34 @@ class ArticleStructuredRenderingRobolectricTest {
         assertTrue(webView.isWebViewDestroyed)
     }
 
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    @Test
+    fun `StructuredArticleFallbackView shows intermediate loading state while processing off main thread then renders plain text`() {
+        val testScheduler = kotlinx.coroutines.test.TestCoroutineScheduler()
+        val backgroundDispatcher = kotlinx.coroutines.test.StandardTestDispatcher(testScheduler)
+        val processor = com.example.erudito.data.remote.parser.WikipediaHtmlSanitizer()
+
+        composeTestRule.setContent {
+            StructuredArticleFallbackView(
+                html = "<section><h2>Título</h2><p>Texto <strong>formatado</strong> em fallback.</p></section>",
+                htmlProcessor = processor,
+                processingDispatcher = backgroundDispatcher
+            )
+        }
+
+        // Enquanto o dispatcher de background não executou, exibe o banner e o estado intermediário de preparo
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("structured_article_fallback_loading").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("structured_article_fallback_text").assertDoesNotExist()
+
+        // Ao concluir o processamento assíncrono em background, exibe o texto extraído sem tags HTML
+        testScheduler.advanceUntilIdle()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("structured_article_fallback_loading").assertDoesNotExist()
+        composeTestRule.onNodeWithTag("structured_article_fallback_text").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Título Texto formatado em fallback.").assertIsDisplayed()
+    }
+
     private fun fakeWebRequest(
         url: String,
         isMainFrame: Boolean = false

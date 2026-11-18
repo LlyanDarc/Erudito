@@ -11,6 +11,7 @@ import com.example.erudito.domain.usecase.DeleteCollectionUseCase
 import com.example.erudito.domain.usecase.GetCollectionWithArticlesUseCase
 import com.example.erudito.domain.usecase.RemoveArticleFromCollectionUseCase
 import com.example.erudito.domain.usecase.RenameCollectionUseCase
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -263,6 +264,83 @@ class CollectionDetailViewModelTest {
         assertEquals(1, state.collectionWithArticles?.articles?.size)
     }
 
+    @Test
+    fun `renameCollection reports error and preserves dialog closed when collection id does not exist`() = runTest {
+        val articleRepository = FakeArticleRepository()
+        val collectionRepository = ReactiveCollectionRepository(articleRepository)
+
+        val viewModel = CollectionDetailViewModel(
+            savedStateHandle = SavedStateHandle(mapOf("collectionId" to 9999L)),
+            getCollectionWithArticlesUseCase = GetCollectionWithArticlesUseCase(collectionRepository),
+            renameCollectionUseCase = RenameCollectionUseCase(collectionRepository),
+            deleteCollectionUseCase = DeleteCollectionUseCase(collectionRepository),
+            removeArticleFromCollectionUseCase = RemoveArticleFromCollectionUseCase(articleRepository)
+        )
+        val feedback = mutableListOf<String>()
+        val feedbackJob = launch(testDispatcher) {
+            viewModel.feedbackEvents.collect { feedback.add(it) }
+        }
+
+        viewModel.openRenameDialog()
+        viewModel.renameCollection("Novo Nome")
+
+        assertFalse(viewModel.uiState.value.isRenameDialogOpen)
+        assertEquals("Coleção não encontrada.", viewModel.uiState.value.errorMessage)
+        assertTrue(feedback.isEmpty())
+        feedbackJob.cancel()
+    }
+
+    @Test
+    fun `CancellationException restores loading and dialog states without error in CollectionDetailViewModel`() = runTest {
+        val sampleArticle = Article(id = 10L, title = "Galileu", url = "https://pt.wikipedia.org/wiki/Galileu")
+        val sampleCollection = CollectionWithArticles(
+            collection = Collection(id = 1L, name = "Astronomia", articleCount = 1),
+            articles = listOf(sampleArticle)
+        )
+        val cancellingCollectionRepo = object : CollectionRepository {
+            override fun getCollections(): Flow<List<Collection>> = MutableStateFlow(emptyList())
+            override fun getCollectionWithArticles(collectionId: Long): Flow<CollectionWithArticles?> =
+                MutableStateFlow(sampleCollection)
+            override suspend fun getCollectionById(collectionId: Long): Collection? = sampleCollection.collection
+            override suspend fun createCollection(name: String): Long = 1L
+            override suspend fun renameCollection(id: Long, newName: String): Unit =
+                throw CancellationException("Cancelado")
+            override suspend fun deleteCollection(id: Long): Unit =
+                throw CancellationException("Cancelado")
+        }
+        val cancellingArticleRepo = object : ArticleRepository by FakeArticleRepository() {
+            override suspend fun removeArticleFromCollection(articleId: Long, collectionId: Long) {
+                throw CancellationException("Cancelado")
+            }
+        }
+
+        val viewModel = CollectionDetailViewModel(
+            savedStateHandle = SavedStateHandle(mapOf("collectionId" to 1L)),
+            getCollectionWithArticlesUseCase = GetCollectionWithArticlesUseCase(cancellingCollectionRepo),
+            renameCollectionUseCase = RenameCollectionUseCase(cancellingCollectionRepo),
+            deleteCollectionUseCase = DeleteCollectionUseCase(cancellingCollectionRepo),
+            removeArticleFromCollectionUseCase = RemoveArticleFromCollectionUseCase(cancellingArticleRepo)
+        )
+
+        viewModel.openRenameDialog()
+        viewModel.renameCollection("Novo Nome")
+        assertFalse(viewModel.uiState.value.isRenameDialogOpen)
+        assertNull(viewModel.uiState.value.errorMessage)
+
+        viewModel.openDeleteDialog()
+        viewModel.deleteCollection()
+        assertFalse(viewModel.uiState.value.isDeleting)
+        assertFalse(viewModel.uiState.value.isDeleted)
+        assertFalse(viewModel.uiState.value.isDeleteDialogOpen)
+        assertNull(viewModel.uiState.value.errorMessage)
+
+        viewModel.openRemoveArticleDialog(sampleArticle)
+        viewModel.confirmRemoveArticle()
+        assertFalse(viewModel.uiState.value.isRemovingArticle)
+        assertNull(viewModel.uiState.value.articleToRemove)
+        assertNull(viewModel.uiState.value.errorMessage)
+    }
+
     private class RaceConditionTestCollectionRepository(
         initial: CollectionWithArticles?,
         private val deleteError: Throwable? = null
@@ -321,10 +399,11 @@ class CollectionDetailViewModelTest {
 
         override suspend fun renameCollection(id: Long, newName: String) {
             val idx = collections.indexOfFirst { it.id == id }
-            if (idx >= 0) {
-                collections[idx] = collections[idx].copy(name = newName)
-                collectionsFlow.value = collections.toList()
+            if (idx < 0) {
+                throw NoSuchElementException("Coleção não encontrada.")
             }
+            collections[idx] = collections[idx].copy(name = newName)
+            collectionsFlow.value = collections.toList()
         }
 
         override suspend fun deleteCollection(id: Long) {

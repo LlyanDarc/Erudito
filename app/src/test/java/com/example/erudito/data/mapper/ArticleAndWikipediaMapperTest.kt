@@ -4,6 +4,8 @@ import com.example.erudito.data.local.entity.ArticleEntity
 import com.example.erudito.data.remote.dto.WikipediaImageDto
 import com.example.erudito.data.remote.dto.WikipediaPageDto
 import com.example.erudito.data.remote.parser.SanitizedWikipediaHtml
+import com.example.erudito.domain.mapper.toDomainArticle
+import com.example.erudito.domain.mapper.toWikipediaArticle
 import com.example.erudito.domain.model.Article
 import com.example.erudito.domain.model.ArticleContentFormat
 import com.example.erudito.domain.model.WikipediaArticle
