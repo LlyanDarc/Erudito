@@ -18,13 +18,73 @@ O **Erudito** resolve esse problema oferecendo um repositório pessoal centraliz
 
 ## 2. Status do Projeto
 
-| Bundle | Descrição | Status |
-|---|---|---|
-| **Bundle 1** | Biblioteca pessoal offline e gerenciamento de coleções | **Concluído** |
-| **Bundle 2** | Pesquisa e consulta à Wikipédia | **Concluído** |
-| **Bundle 3** | Integração entre artigos e coleções (relação N:N) | **Concluído** |
-| **Bundle 4** | Offline First, sincronização e conteúdo estruturado (Parsoid + KaTeX) | **Concluído** |
-| **Bundle 5** | Auditoria técnica, Hilt/KSP, Clean Architecture, testes, APK e documentação | **Concluído (validação técnica e entrega)** |
+O desenvolvimento do **Erudito** seguiu a abordagem **Spec-Driven Development (SDD)** em cinco **Bundles** funcionais principais, com cinco **etapas técnicas intermediárias** (`A`, `B`, `C1`, `C2` e `D`) executadas entre o Bundle 4 e o Bundle 5 para viabilizar o suporte completo a conteúdo estruturado e fórmulas matemáticas offline.
+
+### Bundle 1 — Estrutura inicial e funcionalidades locais
+- **Status:** **Concluído** *(marco consolidado Bundles 1–3 em 15/11/2026: 30 suítes / 156 testes aprovados)*
+- Estrutura inicial da aplicação em Kotlin, Jetpack Compose (Material 3), Navigation Compose e Hilt.
+- Configuração da arquitetura (Clean Architecture + MVVM) e funcionalidades locais da biblioteca pessoal offline com persistência inicial no Room.
+
+### Bundle 2 — Pesquisa e consulta à Wikipédia
+- **Status:** **Concluído** *(marco consolidado Bundles 1–3 em 15/11/2026: 30 suítes / 156 testes aprovados)*
+- Integração com a API da Wikipédia em Português (`pt.wikipedia.org` via MediaWiki Action API com Retrofit, OkHttp e Moshi).
+- Pesquisa e consulta de artigos (`SearchScreen` e `WikipediaArticleScreen`) com estados de carregamento, sucesso, ausência de resultados, erro e referência externa.
+
+### Bundle 3 — Artigos e coleções
+- **Status:** **Concluído** *(marco consolidado Bundles 1–3 em 15/11/2026: 30 suítes / 156 testes aprovados)*
+- Organização dos artigos salvos com identificação única por `wikipediaPageId` no Room v2 (`MIGRATION_1_2`).
+- Criação e gerenciamento de coleções, incluindo criação inline por meio do `CollectionPickerDialog`.
+- Associação de artigos a múltiplas coleções em relação N:N (`CollectionArticleCrossRef`), impedindo duplicidades e atualizando a interface reativamente via `Flow`.
+
+### Bundle 4 — Offline First e sincronização
+- **Status:** **Concluído** *(marco das Etapas 1–4 de Offline First e Sync em 16/11/2026: 38 suítes / 219 testes aprovados)*
+- Persistência local prioritária com Room v3 (`MIGRATION_2_3` adicionando `lastSyncedAt`) e monitoramento real de conectividade (`AndroidConnectivityObserver`).
+- Estratégia Offline First com fallback automático para artigos salvos sem auto-salvamento na leitura online.
+- Sincronização defensiva entre dados locais e remotos (`SyncPolicy` de 6 horas, `ArticleSyncMerger`, auto-sync controlado na `HomeScreen` e atualização manual `forceRefresh`).
+
+### Etapa A — Diagnóstico de conteúdo estruturado *(etapa técnica intermediária)*
+- **Status:** **Concluída**
+- Investigação da API REST Parsoid da Wikipédia (`w/rest.php/v1/page/{title}/html`) para superar limitações da extração textual simples.
+- Análise da preservação de fórmulas matemáticas e expressões LaTeX nos artigos da Wikipédia.
+- Comparação das possibilidades de extração de conteúdo matemático (`data-mw`, MathML `<annotation>` e `alttext`).
+
+### Etapa B — Sanitização e processamento HTML *(etapa técnica intermediária)*
+- **Status:** **Concluída**
+- Implementação do sanitizador HTML (`WikipediaHtmlSanitizer` com Jsoup `Safelist`), removendo scripts, elementos inseguros e ruídos editoriais.
+- Extração e normalização de fórmulas matemáticas para marcação compatível com renderização offline.
+- Tratamento de conteúdo estruturado e substituição segura de expressões não recuperáveis pelo marcador `[Fórmula indisponível]`.
+
+### Etapa C1 — Integração Parsoid e modelos de domínio *(etapa técnica intermediária)*
+- **Status:** **Concluída**
+- Integração com a API REST Parsoid no `WikipediaApiService` e `WikipediaRepositoryImpl`.
+- Criação dos modelos de domínio para conteúdo estruturado (`ArticleContentFormat`, `hasExtractedContent` e contadores de fórmulas).
+- Integração do processamento HTML ao fluxo de obtenção dos artigos.
+
+### Etapa C2 — Persistência de conteúdo estruturado *(etapa técnica intermediária)*
+- **Status:** **Concluída** *(256 testes unitários e Robolectric aprovados conforme `TEST_RESULTS.md`)*
+- Evolução do banco Room para a versão 4 (`erudito_database.db`).
+- Migração do banco de dados (`MIGRATION_3_4`) preservando registros legados no formato `PLAIN_TEXT`.
+- Persistência do formato do conteúdo (`contentFormat`) e dos contadores de fórmulas (`extractedFormulaCount` e `unextractableFormulaCount`).
+- Merge defensivo no `ArticleSyncMerger` para preservar conteúdo `STRUCTURED_HTML` íntegro contra rebaixamentos ou respostas remotas incompletas.
+
+### Etapa D — Renderização estruturada com KaTeX *(etapa técnica intermediária)*
+- **Status:** **Concluída** *(validada manualmente no emulador Android antes do Bundle 5)*
+- Implementação da renderização HTML utilizando `WebView` (`ArticleBodyContent`, `StructuredArticleWebView`, `EruditoArticleWebView` e `ArticleHtmlDocumentBuilder`).
+- Integração do **KaTeX 0.19.1** com assets locais (`katex.min.js`, `katex.min.css`, fontes `.woff2`, `article.css` e `math_renderer.js`) servidos via `WebViewAssetLoader`.
+- Suporte à exibição de fórmulas matemáticas sem depender de serviços externos de renderização.
+- Implementação de políticas de segurança estritas para a `WebView` (`StructuredArticleSecurityPolicy`, CSP restritiva, `WebSettings` endurecidas, validação de links externos e fallback textual assíncrono).
+- Validação manual da renderização estruturada, imagens, fórmulas KaTeX, rolagem interna/externa, reabertura de artigos e estabilidade no emulador Android.
+
+### Bundle 5 — Auditoria, correções e preparação da entrega
+- **Status:** **Concluído** *(validação final em 19/11/2026: 44 suítes / 288 testes aprovados)*
+- Auditoria técnica da aplicação (Clean Architecture, Gradle/Hilt/KSP, concorrência, resiliência, segurança da `WebView` e UI).
+- Correções arquiteturais (`StructuredArticleHtmlProcessor`, `ArticleDomainMapper`, `AndroidConnectivityObserver` compartilhado), de build (`ksp.incremental=false` para `--rerun-tasks`) e de tratamento de `CancellationException`.
+- Melhorias de segurança (`https://` estrito para imagens), desempenho (processamento HTML em `Dispatchers.Default`) e estabilidade (`CollectionPickerCoordinator`).
+- Ampliação e validação dos testes automatizados (44 suítes e 288 testes aprovados, sem falhas, erros ou testes ignorados).
+- Atualização da documentação técnica (`README.md`, `SPECIFICATION.md`, `PLANNING.md`, `TASKS.md` e `TEST_RESULTS.md`).
+- Criação do `AI_USAGE.md`.
+- Geração e verificação do APK de depuração (`app/build/outputs/apk/debug/app-debug.apk`).
+- Preparação e verificação de integridade do pacote `Erudito-1.0-debug.zip` na raiz do projeto.
 
 ---
 
