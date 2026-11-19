@@ -536,17 +536,5 @@ class WikipediaRepositoryImplTest {
 
         override suspend fun getArticleHtml(title: String): Response<ResponseBody> =
             articleHtmlHandler(title)
-
-        override suspend fun getArticleByTitle(
-            title: String,
-            action: String,
-            format: String,
-            formatVersion: Int,
-            prop: String,
-            piProp: String,
-            piThumbSize: Int,
-            inProp: String,
-            redirects: Int
-        ): WikipediaApiResponseDto = WikipediaApiResponseDto()
     }
 }

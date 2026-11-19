@@ -1,115 +1,104 @@
 # Erudito — Registro de Resultados de Testes
 
-**Data da Última Revisão:** 16 de Novembro de 2026  
-**Ambiente:** Android SDK 36 (`compileSdk 36` / `targetSdk 36` / `minSdk 24`), Gradle 9.3.1, Kotlin 2.2.10, Robolectric 4.16.1, JUnit 4.13.2, Dagger Hilt 2.55 (KSP), Room 2.7.0  
-**Comando Final Executado:** `gradle :app:compileDebugKotlin :app:testDebugUnitTest --rerun-tasks` (+ verificação final via `compile_applet`)  
-**Escopo Validado:** Bundles 1, 2, 3 e **Bundle 4 — Offline First e Sincronização** (Etapas 1, 2, 3 e 4 concluídas; Bundle 5 pendente)
+**Data da Última Revisão:** 19 de Novembro de 2026  
+**Ambiente:** Android SDK 36 (`compileSdk 36` / `targetSdk 36` / `minSdk 24`), Gradle `9.3.1`, Kotlin `2.2.10`, AGP `9.1.1`, Robolectric `4.16.1`, JUnit `4.13.2`, Dagger Hilt `2.55` (KSP `2.3.5`), Room `2.7.0` (v4), Jsoup `1.18.3`, AndroidX WebKit `1.18.0`, KaTeX `0.19.1`  
+**Comando Principal de Validação (Etapa 4):** `gradle :app:compileDebugKotlin :app:testDebugUnitTest --rerun-tasks`  
+**Revalidação Pós-Documentação (Etapa 5):** `gradle :app:compileDebugKotlin` e `gradle :app:testDebugUnitTest`  
+**Escopo Validado:** Bundles 1, 2, 3, 4 (incluindo Parsoid, Room v4 e KaTeX/WebView) e **Bundle 5 (Etapas 1 a 5)**
 
 ---
 
-## 1. Histórico Consolidado por Marco e Etapa (Execuções Separadas)
+## 1. Histórico Consolidado por Marco e Etapa (Execuções Independentes)
 
-> **Nota metodológica:** Cada marco abaixo representa uma execução independente da suíte completa no momento da respectiva validação. Os totais **não devem ser somados** entre si. Campos não preservados integralmente no histórico são marcados explicitamente.
+> **Nota metodológica:** Cada marco abaixo representa uma execução independente da suíte completa no momento da respectiva validação. Os totais **não devem ser somados** entre si.
 
 | Marco / Etapa | Escopo Validado | Comando Executado | Suítes | Executados | Aprovados | Falhas / Erros | Ignorados | Compilação | Observações Relevantes |
 |---|---|---|---|---|---|---|---|---|---|
 | **Bundles 1–3** (15/11/2026) | Biblioteca offline, pesquisa/leitura Wikipédia e integração N:N (`v1 → v2`) | `gradle :app:compileDebugKotlin :app:testDebugUnitTest --rerun-tasks` | 30 | 156 | 156 | 0 | 0 | Sucesso | Marco de encerramento do Bundle 3 (`2m 2s`). |
-| **Bundle 4 — Etapa 1** | Conectividade (`NET_CAPABILITY_VALIDATED`), leitura local prioritária, fallback offline e observação reativa | *Não disponível nos registros anteriores* | *Não disponível nos registros anteriores* | *Não disponível nos registros anteriores* | 175 | 0 | 0 | Sucesso | Incluiu validação posterior específica para exigência de `NET_CAPABILITY_VALIDATED` em `AndroidConnectivityObserverTest`. |
-| **Bundle 4 — Etapa 2** | Room v3 (`MIGRATION_2_3`), `lastSyncedAt`, `SyncPolicy`, `ArticleSyncMerger` (`hasExtractedContent`), `@Update` e redirecionamento | *Não disponível nos registros anteriores* (via `:app:testDebugUnitTest` + `compile_applet`) | 35 | 202 | 202 | 0 | 0 | Sucesso | Contagem obtida após correção pontual do merge defensivo para eliminar heurística e usar `hasExtractedContent`. |
-| **Bundle 4 — Etapa 3** | Auto-sync na `HomeScreen`, `HomeSyncStatusBanner`, atualização manual (`forceRefresh`) em `ArticleDetailScreen` e cópia salva na `WikipediaArticleScreen` | *Não disponível nos registros anteriores* (via `:app:testDebugUnitTest` + `compile_applet`) | 38 | 219 | 219 | 0 | 0 | Sucesso | Aprovado em auditoria técnica nas 5 áreas (Home, status, detalhes/Wikipédia, Room N:N e testes). |
-| **Bundle 4 — Etapa 4 (Validação Final — 16/11/2026)** | Consolidação documental, auditoria de conformidade e reexecução integral sem cache (`--rerun-tasks`) | `gradle :app:compileDebugKotlin :app:testDebugUnitTest --rerun-tasks` (+ `compile_applet`) | **38** | **219** | **219** | **0** | **0** | **Sucesso** (`BUILD SUCCESSFUL`) | **33 tarefas executadas em 2m 32s** (`:app:kspDebugKotlin`, `:app:compileDebugKotlin`, `:app:processDebugResources`, `:app:testDebugUnitTest`). |
+| **Bundle 4 — Etapas 1–4** (16/11/2026) | Conectividade, fallback offline, Room v3 (`MIGRATION_2_3`), `SyncPolicy`, `ArticleSyncMerger` e UI de sync | `gradle :app:compileDebugKotlin :app:testDebugUnitTest --rerun-tasks` | 38 | 219 | 219 | 0 | 0 | Sucesso | `33` tarefas em `2m 32s`. |
+| **Bundle 4 — Etapa C2** | Parsoid REST, `WikipediaHtmlSanitizer`, `ArticleContentFormat`, Room v4 (`MIGRATION_3_4`) e merge estruturado | Suíte unitária + Robolectric | — | 256 | 256 | 0 | 0 | Sucesso | Concluída antes da Etapa D conforme histórico do projeto. |
+| **Bundle 4 — Etapa D** | Renderização `STRUCTURED_HTML`, `WebViewAssetLoader`, KaTeX local, CSP e estabilidade da WebView | Suíte unitária/Robolectric + validação prévia em emulador Android | — | — | — | 0 | 0 | Sucesso | Validada em emulador antes do início do Bundle 5. |
+| **Bundle 5 — Etapas 1–3** | Correção Hilt/KSP (`ksp.incremental=false`), Clean Architecture (`StructuredArticleHtmlProcessor`), `CancellationException`, `CollectionPickerCoordinator` | `gradle :app:compileDebugKotlin :app:testDebugUnitTest --rerun-tasks` | 44 | 285 | 285 | 0 | 0 | Sucesso | Base entregue para auditoria final da Etapa 4. |
+| **Bundle 5 — Etapa 4 (Validação Final — 19/11/2026)** | Auditoria de cobertura + 3 testes de borda (`CancellationException` / ID inexistente), `clean`, `assembleDebug` e `--rerun-tasks` | `gradle :app:compileDebugKotlin :app:testDebugUnitTest --rerun-tasks` | **44** | **288** | **288** | **0** | **0** | **Sucesso** (`BUILD SUCCESSFUL`) | `32` tarefas executadas em `3m 44s`; APK `app-debug.apk` gerado e validado. |
 
 ---
 
-## 2. Detalhamento Completo da Execução Final (Bundle 4 — Etapa 4)
+## 2. Detalhamento Completo da Execução Final (44 Suítes / 288 Testes)
 
-Execução realizada em **16 de Novembro de 2026** com `gradle :app:compileDebugKotlin :app:testDebugUnitTest --rerun-tasks`:
+Consolidado diretamente a partir dos relatórios XML JUnit (`app/build/test-results/testDebugUnitTest/TEST-*.xml`) gerados pela execução com `--rerun-tasks` em **19 de Novembro de 2026**:
 
-| Camada | Test Suite | Executados | Aprovados | Reprovados | Ignorados | Tempo |
+| Camada | Test Suite | Executados | Aprovados | Reprovados | Ignorados | Tempo (XML) |
 |---|---|---|---|---|---|---|
-| Domain (Sync) | `ArticleSyncMergerAndPolicyTest` | 11 | 11 | 0 | 0 | 0.00s |
-| Domain | `SyncUseCasesTest` | 11 | 11 | 0 | 0 | 0.54s |
-| Domain | `ObserveArticleByIdAndLocalLookupUseCasesTest` | 3 | 3 | 0 | 0 | 0.01s |
-| Domain | `ArticleCollectionIntegrationUseCasesTest` | 10 | 10 | 0 | 0 | 0.05s |
-| Domain | `CreateCollectionUseCaseTest` | 4 | 4 | 0 | 0 | 0.01s |
-| Domain | `RenameCollectionUseCaseTest` | 4 | 4 | 0 | 0 | 0.01s |
-| Domain | `DeleteCollectionUseCaseTest` | 1 | 1 | 0 | 0 | 0.00s |
-| Domain | `GetCollectionsUseCaseTest` | 2 | 2 | 0 | 0 | 0.00s |
-| Domain | `GetCollectionWithArticlesUseCaseTest` | 2 | 2 | 0 | 0 | 0.01s |
-| Domain | `GetSavedArticlesUseCaseTest` | 2 | 2 | 0 | 0 | 0.00s |
-| Domain | `GetArticleByIdUseCaseTest` | 2 | 2 | 0 | 0 | 0.00s |
-| Domain | `WikipediaUseCasesTest` | 7 | 7 | 0 | 0 | 0.01s |
-| Data (Connectivity) | `AndroidConnectivityObserverTest` | 5 | 5 | 0 | 0 | 4.22s |
-| Data (Room Integration) | `RoomDatabaseIntegrationTest` | 18 | 18 | 0 | 0 | 4.15s |
-| Data (Mappers) | `ArticleAndWikipediaMapperTest` | 5 | 5 | 0 | 0 | 0.01s |
-| Data (Remote DTOs) | `WikipediaDtoDeserializationTest` | 7 | 7 | 0 | 0 | 0.23s |
-| Data (Repositories) | `ArticleRepositoryImplTest` | 6 | 6 | 0 | 0 | 0.34s |
-| Data (Repositories) | `WikipediaRepositoryImplTest` | 9 | 9 | 0 | 0 | 0.13s |
-| Presentation (ViewModel) | `HomeSyncTest` | 7 | 7 | 0 | 0 | 0.53s |
-| Presentation (ViewModel) | `ArticleDetailSyncTest` | 7 | 7 | 0 | 0 | 1.01s |
-| Presentation (ViewModel) | `WikipediaArticleRefreshSavedCopyTest` | 3 | 3 | 0 | 0 | 0.23s |
-| Presentation (ViewModel) | `SearchViewModelTest` | 10 | 10 | 0 | 0 | 0.02s |
-| Presentation (ViewModel) | `WikipediaArticleViewModelTest` | 17 | 17 | 0 | 0 | 0.08s |
-| Presentation (ViewModel) | `CollectionDetailViewModelTest` | 6 | 6 | 0 | 0 | 0.03s |
-| Presentation (ViewModel) | `ArticleDetailViewModelTest` | 8 | 8 | 0 | 0 | 0.07s |
-| Presentation (UI & Compose) | `HomeConnectivityTest` | 1 | 1 | 0 | 0 | 0.14s |
-| Presentation (UI & Compose) | `HomeErrorHandlingTest` | 2 | 2 | 0 | 0 | 0.18s |
-| Presentation (UI & Compose) | `HomeScreenDuplicateKeyTest` | 1 | 1 | 0 | 0 | 0.11s |
-| Presentation (UI & Compose) | `SearchScreenTest` | 7 | 7 | 0 | 0 | 0.97s |
-| Presentation (UI & Compose) | `WikipediaArticleScreenTest` | 11 | 11 | 0 | 0 | 1.42s |
-| Presentation (UI & Compose) | `CollectionPickerDialogTest` | 5 | 5 | 0 | 0 | 1.03s |
-| Presentation (UI & Compose) | `CollectionDetailScreenTest` | 3 | 3 | 0 | 0 | 0.83s |
-| Presentation (UI & Compose) | `ArticleDetailScreenTest` | 7 | 7 | 0 | 0 | 5.59s |
-| Presentation (UI & Compose) | `CollectionFeedbackMessagesTest` | 5 | 5 | 0 | 0 | 1.09s |
-| Presentation (Navigation) | `EruditoNavigationTest` | 5 | 5 | 0 | 0 | 1.16s |
-| Presentation (E2E Room + Nav) | `Bundle3EndToEndIntegrationTest` | 3 | 3 | 0 | 0 | 2.79s |
-| Presentation / Resources | `ExampleRobolectricTest` | 1 | 1 | 0 | 0 | 8.47s |
-| Unit | `ExampleUnitTest` | 1 | 1 | 0 | 0 | 0.00s |
-| **Total (Execução Final)** | **38 Suítes** | **219** | **219** | **0** | **0** | **2m 32s (Gradle build + rerun-tasks)** |
-
-**Resultado Geral:** **SUCESSO (38 suítes, 219 testes executados, 219 aprovados, 0 falhas, 0 erros, 0 ignorados)**
-
----
-
-## 3. Cobertura por Bundle e Etapa
-
-### 3.1. Bundle 1 — Biblioteca Pessoal Offline
-- Regras de negócio RN01–RN07 na camada Domain (`CreateCollectionUseCaseTest`, `RenameCollectionUseCaseTest`, `DeleteCollectionUseCaseTest`, `GetCollectionsUseCaseTest`, `GetCollectionWithArticlesUseCaseTest`, `GetSavedArticlesUseCaseTest`, `GetArticleByIdUseCaseTest`).
-- Persistência SQLite, integridade referencial, remoção em cascata (RN05) e pré-população atômica (`RoomDatabaseIntegrationTest`).
-- Feedbacks visuais, tratamento de erros e chaves únicas em listas (`CollectionFeedbackMessagesTest`, `HomeErrorHandlingTest`, `HomeScreenDuplicateKeyTest`).
-
-### 3.2. Bundle 2 — Pesquisa e Consulta à Wikipédia
-- Desserialização de DTOs da API MediaWiki e mapeamento para modelos de domínio (`WikipediaDtoDeserializationTest`, `ArticleAndWikipediaMapperTest`, `WikipediaRepositoryImplTest`, `WikipediaUseCasesTest`).
-- Fluxo de pesquisa e leitura online (`SearchViewModelTest`, `SearchScreenTest`, `WikipediaArticleViewModelTest`, `WikipediaArticleScreenTest`, `EruditoNavigationTest`).
-
-### 3.3. Bundle 3 — Integração entre Artigos e Coleções (Relação N:N)
-- **Banco Room & Migração v1 → v2 (`RoomDatabaseIntegrationTest`):** migração `MIGRATION_1_2` preservando dados legados, índice único para `wikipediaPageId` não nulo, reutilização de artigos por `wikipediaPageId` e por fallback de URL legado, rollback atômico e remoção individual de `CollectionArticleCrossRef`.
-- **Repositório, Casos de Uso & Telas (`ArticleRepositoryImplTest`, `ArticleCollectionIntegrationUseCasesTest`, `CollectionPickerDialogTest`, `CollectionDetailViewModelTest`, `CollectionDetailScreenTest`, `ArticleDetailViewModelTest`, `ArticleDetailScreenTest`):** seleção múltipla, criação inline de coleções, desvinculação segura e abertura da URL persistida via `LocalUriHandler`.
-- **Integração Ponta a Ponta (`Bundle3EndToEndIntegrationTest`, `EruditoNavigationTest`):** validação completa com `EruditoDatabase` real em memória, repositórios reais, UseCases reais, ViewModels reais e `EruditoNavHost`.
-
-### 3.4. Bundle 4 — Offline First e Sincronização
-- **Etapa 1 — Conectividade, Leitura Local Prioritária e Fallback Offline:**
-  - `AndroidConnectivityObserverTest`: validação de `NET_CAPABILITY_INTERNET` + `NET_CAPABILITY_VALIDATED` + `NET_CAPABILITY_NOT_SUSPENDED`, rede sem `VALIDATED` tratada como offline, rede sem `INTERNET` como offline, perda/recuperação de rede e registro/cancelamento de `NetworkCallback`.
-  - `ObserveArticleByIdAndLocalLookupUseCasesTest`, `ArticleRepositoryImplTest`, `ArticleAndWikipediaMapperTest`: observação contínua por `Flow` e conversão `Article.toWikipediaArticle()`.
-  - `WikipediaArticleViewModelTest`, `WikipediaArticleScreenTest`, `SearchViewModelTest`, `SearchScreenTest`, `ArticleDetailViewModelTest`, `HomeConnectivityTest`, `EruditoNavigationTest`: leitura offline prioritária e fallback automático para cópia local salva sem auto-salvamento de artigos online.
-- **Etapa 2 — Banco de Dados v3, Estratégia de Sincronização e Merge Defensivo:**
-  - `RoomDatabaseIntegrationTest`: validação das migrações `v1 → v2 → v3` e `v2 → v3` (`MIGRATION_2_3`), verificação de `lastSyncedAt = NULL` nos registros pré-existentes, preservação integral de registros e associações `collection_article_cross_ref` após atualização via `@Update`, e checagem de colisão do índice único `wikipediaPageId`.
-  - `ArticleSyncMergerAndPolicyTest` e `ArticleAndWikipediaMapperTest`: janela de frescor de 6 horas (`SyncPolicy`), proteção explícita por `hasExtractedContent` (impedindo sobrescrita quando `extract` vem vazio/nulo com fallback de `description`), preservação de descrição/imagem locais, `lastUpdated` inalterado sem mudança real de conteúdo e atualização segura de `lastSyncedAt`.
-  - `SyncUseCasesTest`: `RefreshSavedArticleUseCase` e `SyncSavedArticlesUseCase` cobrindo elegibilidade, `forceRefresh`, artigos sem `wikipediaPageId`, colisões em redirecionamento, falhas parciais, falhas totais, modo offline e propagação de `CancellationException`.
-- **Etapa 3 — Integração da Sincronização com a Interface:**
-  - `HomeSyncTest`: auto-sync único por ciclo de vida da `HomeViewModel`, não redisparo por emissões do Room, recuperação única ao retornar online, diferenciação entre atualizações/sem alterações/falha parcial/falha total/offline, retry manual sem recriar ViewModel e guarda contra execução simultânea.
-  - `ArticleDetailSyncTest` e `ArticleDetailScreenTest`: atualização manual (`forceRefresh = true`), exibição da data/hora de `lastSyncedAt`, estado para artigo sem vínculo remoto, isolamento de mensagens técnicas de exceção e prevenção de duplo disparo.
-  - `WikipediaArticleRefreshSavedCopyTest` e `WikipediaArticleScreenTest`: atualização manual da cópia local salva (`"Atualizar cópia salva"`) e guarda contra chamadas concorrentes.
+| Domain (Sync) | `ArticleSyncMergerAndPolicyTest` | 15 | 15 | 0 | 0 | 0.006s |
+| Domain (Mappers) | `ArticleDomainMapperTest` | 2 | 2 | 0 | 0 | 0.001s |
+| Domain | `SyncUseCasesTest` | 13 | 13 | 0 | 0 | 0.890s |
+| Domain | `ObserveArticleByIdAndLocalLookupUseCasesTest` | 3 | 3 | 0 | 0 | 0.008s |
+| Domain | `ArticleCollectionIntegrationUseCasesTest` | 10 | 10 | 0 | 0 | 0.103s |
+| Domain | `CreateCollectionUseCaseTest` | 4 | 4 | 0 | 0 | 0.009s |
+| Domain | `RenameCollectionUseCaseTest` | 4 | 4 | 0 | 0 | 0.012s |
+| Domain | `DeleteCollectionUseCaseTest` | 1 | 1 | 0 | 0 | 0.006s |
+| Domain | `GetCollectionsUseCaseTest` | 2 | 2 | 0 | 0 | 0.006s |
+| Domain | `GetCollectionWithArticlesUseCaseTest` | 2 | 2 | 0 | 0 | 0.014s |
+| Domain | `GetSavedArticlesUseCaseTest` | 2 | 2 | 0 | 0 | 0.006s |
+| Domain | `GetArticleByIdUseCaseTest` | 2 | 2 | 0 | 0 | 0.006s |
+| Domain | `WikipediaUseCasesTest` | 7 | 7 | 0 | 0 | 0.015s |
+| DI (Hilt) | `EruditoHiltModuleTest` | 1 | 1 | 0 | 0 | 0.001s |
+| Data (Connectivity) | `AndroidConnectivityObserverTest` | 6 | 6 | 0 | 0 | 4.309s |
+| Data (Room Integration) | `RoomDatabaseIntegrationTest` | 20 | 20 | 0 | 0 | 5.750s |
+| Data (Mappers) | `ArticleAndWikipediaMapperTest` | 10 | 10 | 0 | 0 | 0.023s |
+| Data (Remote DTOs) | `WikipediaDtoDeserializationTest` | 7 | 7 | 0 | 0 | 0.351s |
+| Data (HTML/LaTeX Parser) | `WikipediaHtmlSanitizerTest` | 20 | 20 | 0 | 0 | 0.296s |
+| Data (Repositories) | `ArticleRepositoryImplTest` | 6 | 6 | 0 | 0 | 0.557s |
+| Data (Repositories) | `CollectionRepositoryImplTest` | 2 | 2 | 0 | 0 | 0.160s |
+| Data (Repositories) | `WikipediaRepositoryImplTest` | 14 | 14 | 0 | 0 | 0.311s |
+| Presentation (ViewModel) | `HomeSyncTest` | 7 | 7 | 0 | 0 | 0.938s |
+| Presentation (ViewModel) | `ArticleDetailSyncTest` | 7 | 7 | 0 | 0 | 1.846s |
+| Presentation (ViewModel) | `WikipediaArticleRefreshSavedCopyTest` | 3 | 3 | 0 | 0 | 0.367s |
+| Presentation (ViewModel) | `SearchViewModelTest` | 11 | 11 | 0 | 0 | 0.043s |
+| Presentation (ViewModel) | `WikipediaArticleViewModelTest` | 18 | 18 | 0 | 0 | 0.138s |
+| Presentation (ViewModel) | `CollectionDetailViewModelTest` | 9 | 9 | 0 | 0 | 0.077s |
+| Presentation (ViewModel) | `ArticleDetailViewModelTest` | 8 | 8 | 0 | 0 | 0.244s |
+| Presentation (UI & Compose) | `HomeConnectivityTest` | 1 | 1 | 0 | 0 | 0.256s |
+| Presentation (UI & Compose) | `HomeErrorHandlingTest` | 4 | 4 | 0 | 0 | 0.774s |
+| Presentation (UI & Compose) | `HomeScreenDuplicateKeyTest` | 1 | 1 | 0 | 0 | 0.166s |
+| Presentation (UI & Compose) | `SearchScreenTest` | 7 | 7 | 0 | 0 | 1.600s |
+| Presentation (UI & Compose) | `WikipediaArticleScreenTest` | 12 | 12 | 0 | 0 | 1.912s |
+| Presentation (UI & Compose) | `CollectionPickerDialogTest` | 5 | 5 | 0 | 0 | 1.602s |
+| Presentation (UI & Compose) | `CollectionDetailScreenTest` | 3 | 3 | 0 | 0 | 1.486s |
+| Presentation (UI & Compose) | `ArticleDetailScreenTest` | 8 | 8 | 0 | 0 | 10.899s |
+| Presentation (UI & Compose) | `CollectionFeedbackMessagesTest` | 7 | 7 | 0 | 0 | 2.843s |
+| Presentation (WebView/HTML) | `ArticleHtmlRenderingUnitTest` | 6 | 6 | 0 | 0 | 0.026s |
+| Presentation (WebView/HTML) | `ArticleStructuredRenderingRobolectricTest` | 8 | 8 | 0 | 0 | 2.420s |
+| Presentation (Navigation) | `EruditoNavigationTest` | 5 | 5 | 0 | 0 | 1.769s |
+| Presentation (E2E Room + Nav) | `Bundle3EndToEndIntegrationTest` | 3 | 3 | 0 | 0 | 4.860s |
+| Presentation / Resources | `ExampleRobolectricTest` | 1 | 1 | 0 | 0 | 11.310s |
+| Unit | `ExampleUnitTest` | 1 | 1 | 0 | 0 | 0.001s |
+| **Total Consolidado** | **44 Suítes** | **288** | **288** | **0** | **0** | **58.42s (soma XML) / 3m 44s (Gradle)** |
 
 ---
 
-## 4. Pendências para Validação Manual em Ambiente Android Studio / Dispositivo Real
+## 3. Verificação dos Artefatos de Entrega
 
-As seguintes verificações dependem de execução manual em dispositivo físico ou emulador interativo no Android Studio (fora do alcance dos testes JVM/Robolectric):
+- **APK original (`app/build/outputs/apk/debug/app-debug.apk`):**
+  - Tamanho: `21.210.469` bytes (`~20,23 MiB`)
+  - SHA-256: `c7757122bef7cd7f55f5acbfc8377f932b17b9ff3ffc7d1a21e9300fd63477a1`
+  - Metadados (`aapt2 dump badging`): `package='com.aistudio.erudito.wklvqz'`, `versionCode='1'`, `versionName='1.0'`, `minSdkVersion='24'`, `targetSdkVersion='36'`, `application-label='Erudito'`.
+  - Assinatura (`apksigner verify`): APK Signature Scheme v2 válida (`CN=Android Debug, O=Android, C=US`, RSA 2048-bit).
+  - Assets verificados no APK: `assets/erudito/article.css`, `assets/erudito/math_renderer.js`, `assets/katex/katex.min.css`, `assets/katex/katex.min.js` e `20` arquivos `.woff2` em `assets/katex/fonts/`.
+- **Pacote ZIP na raiz (`Erudito-1.0-debug.zip`):**
+  - Contém exclusivamente `app-debug.apk` (`20.648.877` bytes / `~19,69 MiB`).
+  - Integridade ZIP verificada (`unzip -tq`) e hash SHA-256 extraído idêntico ao APK original.
 
-- **Integração real com a API MediaWiki (`pt.wikipedia.org`):** validar latência, respostas reais de pesquisa/extrato/redirecionamentos e aceitação do cabeçalho `User-Agent` configurado.
-- **Conectividade real em hardware (`AndroidConnectivityObserver`):** validar transições reais entre Wi-Fi, dados móveis, modo avião e **portal cativo** (rede com `NET_CAPABILITY_INTERNET` sem `NET_CAPABILITY_VALIDATED`).
-- **Cache em disco do Coil:** confirmar carregamento real de imagens online e exibição via cache em disco após ativar o modo avião.
-- **Migração Room em disco e persistência entre processos (`erudito_database.db`):** testar atualização real de instalação prévia (`v1`/`v2 → v3`) preservando artigos salvos e coleções N:N, além de encerramento completo (*force stop*) e reabertura do processo Android.
-- **Experiência visual e interação real:** conferência de contraste/densidade Material 3, banners de status na `HomeScreen`, snackbars e abertura de link externo no navegador (`LocalUriHandler`) em `WikipediaArticleScreen` e `ArticleDetailScreen`.
-- **Geração e validação de artefato instalável:** geração de APK debug (`gradle assembleDebug`) para instalação manual no dispositivo de avaliação (prevista na etapa de entrega do Bundle 5).
+---
+
+## 4. Limitações de Validação e Checklist Manual Pendente para Dispositivo/Emulador
+
+No ambiente containerizado da Etapa 4/5, `adb devices` não possui alvos conectados e o binário `emulator` não está disponível. Embora a Etapa D tenha sido validada anteriormente em emulador, permanecem pendentes de conferência manual final pós-Bundle 5 no Android Studio ou dispositivo físico:
+
+1. **Instalação e inicialização:** instalar `app-debug.apk` (`Erudito-1.0-debug.zip`), abrir o app e confirmar exibição da Home com coleções e artigos iniciais.
+2. **Pesquisa e renderização estruturada:** buscar artigo científico/matemático na Wikipédia em Português, confirmar ausência de tags HTML literais, carregamento de imagens HTTPS e renderização das fórmulas via KaTeX `0.19.1` offline.
+3. **Rolagem aninhada e estabilidade da WebView:** rolar internamente/externamente artigo longo, rotacionar e reabrir o artigo verificando ausência de `Webpage not available` ou encerramento do renderer.
+4. **Links externos:** tocar em link dentro do artigo confirmando abertura controlada em navegador externo.
+5. **Coleções e multi-seleção:** criar coleção no seletor, associar artigo a múltiplas coleções, reabrir seletor conferindo `"Já salvo"` e remover vínculo individual sem apagar o artigo.
+6. **Offline First e sincronização em rede real:** alternar Wi-Fi/modo avião/portal cativo, confirmar leitura offline e fallback local na busca, depois reconectar e testar atualização manual (`forceRefresh = true`).
+7. **Persistência em disco após encerramento:** forçar fechamento do processo Android e reabrir o app confirmando manutenção de artigos `STRUCTURED_HTML`, coleções e vínculos N:N.

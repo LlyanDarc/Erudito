@@ -251,7 +251,10 @@ fun SearchScreenContent(
                             contentPadding = PaddingValues(16.dp),
                             verticalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
-                            item(key = "search_results_header") {
+                            item(
+                                key = "search_results_header",
+                                contentType = "section_header"
+                            ) {
                                 val countLabel = if (content.results.size == 1) {
                                     "1 resultado para \"${uiState.lastSearchedQuery}\""
                                 } else {
@@ -267,7 +270,8 @@ fun SearchScreenContent(
 
                             items(
                                 items = content.results,
-                                key = { "wiki_${it.pageId}" }
+                                key = { "wiki_${it.pageId}" },
+                                contentType = { "search_result_card" }
                             ) { result ->
                                 SearchResultCard(
                                     result = result,

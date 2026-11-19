@@ -46,8 +46,10 @@ fun SearchResultCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val hasThumbnail = !result.thumbnailUrl.isNullOrBlank()
-    var imageLoadFailed by remember(result.thumbnailUrl) { mutableStateOf(false) }
+    val safeThumbnailUrl = result.thumbnailUrl?.takeIf {
+        StructuredArticleSecurityPolicy.isAllowedRemoteImageUrl(it)
+    }
+    var imageLoadFailed by remember(safeThumbnailUrl) { mutableStateOf(false) }
 
     Card(
         modifier = modifier
@@ -91,7 +93,7 @@ fun SearchResultCard(
                     }
                 }
 
-                if (hasThumbnail) {
+                if (safeThumbnailUrl != null) {
                     Surface(
                         shape = RoundedCornerShape(12.dp),
                         color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
@@ -103,7 +105,7 @@ fun SearchResultCard(
                         if (!imageLoadFailed) {
                             AsyncImage(
                                 model = ImageRequest.Builder(LocalContext.current)
-                                    .data(result.thumbnailUrl)
+                                    .data(safeThumbnailUrl)
                                     .crossfade(true)
                                     .build(),
                                 contentDescription = "Miniatura de ${result.title}",

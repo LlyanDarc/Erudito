@@ -165,7 +165,8 @@ fun CollectionPickerDialog(
                         ) {
                             items(
                                 items = collections,
-                                key = { it.id }
+                                key = { it.id },
+                                contentType = { "collection_picker_item" }
                             ) { collection ->
                                 val isChecked = collection.id in selectedCollectionIds
                                 val isPreviouslyAssociated = collection.id in initiallyAssociatedIds

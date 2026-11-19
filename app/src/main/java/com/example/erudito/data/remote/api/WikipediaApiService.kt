@@ -49,17 +49,4 @@ interface WikipediaApiService {
     suspend fun getArticleHtml(
         @Path("title") title: String
     ): Response<ResponseBody>
-
-    @GET("w/api.php")
-    suspend fun getArticleByTitle(
-        @Query("titles") title: String,
-        @Query("action") action: String = "query",
-        @Query("format") format: String = "json",
-        @Query("formatversion") formatVersion: Int = 2,
-        @Query("prop") prop: String = "pageimages|description|info",
-        @Query("piprop") piProp: String = "original|thumbnail",
-        @Query("pithumbsize") piThumbSize: Int = 800,
-        @Query("inprop") inProp: String = "url",
-        @Query("redirects") redirects: Int = 1
-    ): WikipediaApiResponseDto
 }

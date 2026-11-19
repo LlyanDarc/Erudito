@@ -3,10 +3,10 @@ package com.example.erudito.data.mapper
 import com.example.erudito.data.remote.dto.WikipediaApiResponseDto
 import com.example.erudito.data.remote.dto.WikipediaPageDto
 import com.example.erudito.data.remote.parser.SanitizedWikipediaHtml
-import com.example.erudito.domain.model.Article
 import com.example.erudito.domain.model.ArticleContentFormat
 import com.example.erudito.domain.model.WikipediaArticle
 import com.example.erudito.domain.model.WikipediaSearchResult
+import java.net.URI
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
 
@@ -23,7 +23,7 @@ fun WikipediaPageDto.toSearchResultOrNull(): WikipediaSearchResult? {
     val safeTitle = title?.trim()?.takeIf { it.isNotEmpty() } ?: return null
     val safeDescription = description?.trim()?.takeIf { it.isNotEmpty() }
     val safeSnippet = extract?.trim()?.takeIf { it.isNotEmpty() }
-    val safeThumbnailUrl = (thumbnail?.source ?: original?.source)?.trim()?.takeIf { it.isNotEmpty() }
+    val safeThumbnailUrl = sanitizeHttpsImageUrl(thumbnail?.source ?: original?.source)
     val safeUrl = (fullUrl ?: canonicalUrl)?.trim()?.takeIf { it.isNotEmpty() }
         ?: buildWikipediaArticleUrl(safeTitle)
 
@@ -37,11 +37,6 @@ fun WikipediaPageDto.toSearchResultOrNull(): WikipediaSearchResult? {
     )
 }
 
-fun WikipediaApiResponseDto.toWikipediaArticleOrNull(): WikipediaArticle? {
-    val page = query?.pages?.firstOrNull() ?: return null
-    return page.toWikipediaArticleOrNull()
-}
-
 fun WikipediaPageDto.toWikipediaArticleOrNull(): WikipediaArticle? {
     if (missing == true) return null
     val id = pageId?.takeIf { it > 0L } ?: return null
@@ -51,7 +46,7 @@ fun WikipediaPageDto.toWikipediaArticleOrNull(): WikipediaArticle? {
     val safeContent = extractedContent
         ?: safeDescription
         ?: ""
-    val safeImageUrl = (original?.source ?: thumbnail?.source)?.trim()?.takeIf { it.isNotEmpty() }
+    val safeImageUrl = sanitizeHttpsImageUrl(original?.source ?: thumbnail?.source)
     val safeUrl = (fullUrl ?: canonicalUrl)?.trim()?.takeIf { it.isNotEmpty() }
         ?: buildWikipediaArticleUrl(safeTitle)
 
@@ -75,7 +70,7 @@ fun WikipediaPageDto.toStructuredWikipediaArticleOrNull(
     val safeTitle = title?.trim()?.takeIf { it.isNotEmpty() } ?: return null
     val safeHtml = sanitizedHtml.html.trim().takeIf { it.isNotEmpty() } ?: return null
     val safeDescription = description?.trim()?.takeIf { it.isNotEmpty() }
-    val safeImageUrl = (original?.source ?: thumbnail?.source)?.trim()?.takeIf { it.isNotEmpty() }
+    val safeImageUrl = sanitizeHttpsImageUrl(original?.source ?: thumbnail?.source)
     val safeUrl = (fullUrl ?: canonicalUrl)?.trim()?.takeIf { it.isNotEmpty() }
         ?: buildWikipediaArticleUrl(safeTitle)
 
@@ -91,6 +86,18 @@ fun WikipediaPageDto.toStructuredWikipediaArticleOrNull(
         extractedFormulaCount = sanitizedHtml.extractedFormulaCount,
         unextractableFormulaCount = sanitizedHtml.unextractableFormulaCount
     )
+}
+
+internal fun sanitizeHttpsImageUrl(rawUrl: String?): String? {
+    val trimmed = rawUrl?.trim()?.takeIf { it.isNotEmpty() } ?: return null
+    val parsed = runCatching { URI(trimmed) }.getOrNull() ?: return null
+    val scheme = parsed.scheme ?: return null
+    val host = parsed.host ?: return null
+    return if (scheme.equals("https", ignoreCase = true) && host.isNotBlank()) {
+        trimmed
+    } else {
+        null
+    }
 }
 
 internal fun buildWikipediaArticleUrl(title: String): String {

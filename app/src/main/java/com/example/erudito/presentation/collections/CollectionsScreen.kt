@@ -168,7 +168,8 @@ fun CollectionsScreenContent(
             ) {
                 items(
                     items = uiState.collections,
-                    key = { "collection_${it.id}" }
+                    key = { "collection_${it.id}" },
+                    contentType = { "collection_card" }
                 ) { collection ->
                     CollectionCard(
                         collection = collection,
@@ -178,7 +179,10 @@ fun CollectionsScreenContent(
                     )
                 }
 
-                item {
+                item(
+                    key = "collections_bottom_spacer",
+                    contentType = "spacer"
+                ) {
                     Spacer(modifier = Modifier.height(72.dp))
                 }
             }

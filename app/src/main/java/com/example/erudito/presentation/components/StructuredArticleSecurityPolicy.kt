@@ -65,4 +65,13 @@ object StructuredArticleSecurityPolicy {
         }
         return scheme.equals("https", ignoreCase = true) && !host.isNullOrBlank()
     }
+
+    fun isAllowedRemoteImageUrl(rawUrl: String?): Boolean {
+        val trimmed = rawUrl?.trim()?.takeIf { it.isNotEmpty() } ?: return false
+        val parsed = runCatching { URI(trimmed) }.getOrNull() ?: return false
+        val scheme = parsed.scheme?.lowercase() ?: return false
+        if (scheme != "https") return false
+        val host = parsed.host?.lowercase() ?: return false
+        return host.isNotBlank() && host != ASSET_HOST
+    }
 }

@@ -17,7 +17,7 @@ object ArticleHtmlDocumentBuilder {
             "script-src $LOCAL_ASSETS_ORIGIN; " +
             "style-src $LOCAL_ASSETS_ORIGIN 'unsafe-inline'; " +
             "font-src $LOCAL_ASSETS_ORIGIN; " +
-            "img-src https: data:; " +
+            "img-src https:; " +
             "object-src 'none'; " +
             "frame-src 'none'; " +
             "base-uri 'none'; " +

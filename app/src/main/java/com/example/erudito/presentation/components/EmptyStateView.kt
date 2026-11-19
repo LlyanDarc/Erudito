@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Button
@@ -60,7 +61,9 @@ fun EmptyStateView(
             Spacer(modifier = Modifier.height(20.dp))
             Button(
                 onClick = onActionClick,
-                modifier = Modifier.testTag("empty_state_action_button")
+                modifier = Modifier
+                    .heightIn(min = 48.dp)
+                    .testTag("empty_state_action_button")
             ) {
                 Text(actionButtonText)
             }

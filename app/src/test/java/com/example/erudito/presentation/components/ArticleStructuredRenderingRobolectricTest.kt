@@ -94,6 +94,7 @@ class ArticleStructuredRenderingRobolectricTest {
         @Suppress("DEPRECATION")
         assertFalse(webView.settings.allowUniversalAccessFromFileURLs)
         assertFalse(webView.settings.domStorageEnabled)
+        @Suppress("DEPRECATION")
         assertFalse(webView.settings.databaseEnabled)
         assertFalse(webView.settings.javaScriptCanOpenWindowsAutomatically)
         assertEquals(WebSettings.MIXED_CONTENT_NEVER_ALLOW, webView.settings.mixedContentMode)

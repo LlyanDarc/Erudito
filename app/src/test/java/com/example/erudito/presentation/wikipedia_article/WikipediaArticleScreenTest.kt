@@ -536,6 +536,52 @@ class WikipediaArticleScreenTest {
         composeTestRule.onNodeWithText("Sem conexão").assertIsDisplayed()
     }
 
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun `WikipediaArticleScreen shows snackbar feedback when LocalUriHandler fails to open URL`() {
+        val dispatcher = UnconfinedTestDispatcher()
+        Dispatchers.setMain(dispatcher)
+        try {
+            val fakeRepo = FakeScreenWikipediaRepository(
+                article = WikipediaArticle(
+                    pageId = 505L,
+                    title = "Marie Curie",
+                    content = "Física e química.",
+                    url = "https://pt.wikipedia.org/wiki/Marie_Curie"
+                )
+            )
+            val viewModel = buildViewModel(
+                savedStateHandle = SavedStateHandle(mapOf(WikipediaArticleViewModel.ARG_PAGE_ID to 505L)),
+                wikipediaRepo = fakeRepo
+            )
+            val failingUriHandler = object : UriHandler {
+                override fun openUri(uri: String) {
+                    throw IllegalStateException("Nenhum navegador encontrado")
+                }
+            }
+
+            composeTestRule.setContent {
+                CompositionLocalProvider(LocalUriHandler provides failingUriHandler) {
+                    WikipediaArticleScreen(
+                        viewModel = viewModel,
+                        onNavigateBack = {}
+                    )
+                }
+            }
+
+            composeTestRule.waitForIdle()
+            composeTestRule.onNodeWithTag("wikipedia_article_open_url_button")
+                .performScrollTo()
+                .performClick()
+            composeTestRule.waitForIdle()
+
+            composeTestRule.onNodeWithText("Não foi possível abrir o link no navegador.")
+                .assertExists()
+        } finally {
+            Dispatchers.resetMain()
+        }
+    }
+
     private class FakeScreenWikipediaRepository(
         private val article: WikipediaArticle,
         private var failFirstAttempt: Boolean = false

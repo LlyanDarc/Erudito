@@ -58,7 +58,7 @@ class WikipediaArticleViewModelTest {
     private fun createViewModel(
         savedStateHandle: SavedStateHandle = SavedStateHandle(),
         articleRepo: ArticleRepository = fakeArticleRepository,
-        collectionRepo: FakeCollectionRepository = fakeCollectionRepository,
+        collectionRepo: com.example.erudito.domain.repository.CollectionRepository = fakeCollectionRepository,
         connectivityObserver: FakeConnectivityObserver = FakeConnectivityObserver()
     ): WikipediaArticleViewModel {
         return WikipediaArticleViewModel(
@@ -716,6 +716,62 @@ class WikipediaArticleViewModelTest {
             val recoveredState = viewModel.uiState.value as WikipediaArticleUiState.Success
             assertFalse(recoveredState.isLocalFallback)
             assertEquals("Texto completo online atualizado.", recoveredState.article.content)
+        } finally {
+            Dispatchers.resetMain()
+        }
+    }
+
+    @Test
+    fun `CancellationException in picker create and confirm resets flags without setting pickerErrorMessage`() = runTest {
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        Dispatchers.setMain(dispatcher)
+        try {
+            val cancellingCollectionRepo = object : com.example.erudito.domain.repository.CollectionRepository by fakeCollectionRepository {
+                override suspend fun createCollection(name: String): Long {
+                    throw kotlinx.coroutines.CancellationException("Criação cancelada")
+                }
+            }
+            val colId = fakeCollectionRepository.createCollection("Física")
+            val cancellingArticleRepo = object : ArticleRepository by fakeArticleRepository {
+                override suspend fun saveArticleAndAssociateCollections(
+                    article: Article,
+                    collectionIds: List<Long>
+                ): Long {
+                    throw kotlinx.coroutines.CancellationException("Salvamento cancelado")
+                }
+            }
+            val wikiArticle = WikipediaArticle(
+                pageId = 710L,
+                title = "Relatividade",
+                content = "Conteúdo",
+                url = "https://pt.wikipedia.org/wiki/Relatividade"
+            )
+            fakeRepository.articleById[710L] = wikiArticle
+
+            val createCancelVm = createViewModel(
+                savedStateHandle = SavedStateHandle(mapOf(WikipediaArticleViewModel.ARG_PAGE_ID to 710L)),
+                collectionRepo = cancellingCollectionRepo
+            )
+            advanceUntilIdle()
+            createCancelVm.openCollectionPicker()
+            createCancelVm.createCollection("Nova Coleção")
+            advanceUntilIdle()
+
+            assertFalse(createCancelVm.collectionsUiState.value.isCreatingCollection)
+            assertNull(createCancelVm.collectionsUiState.value.pickerErrorMessage)
+
+            val saveCancelVm = createViewModel(
+                savedStateHandle = SavedStateHandle(mapOf(WikipediaArticleViewModel.ARG_PAGE_ID to 710L)),
+                articleRepo = cancellingArticleRepo
+            )
+            advanceUntilIdle()
+            saveCancelVm.openCollectionPicker()
+            saveCancelVm.toggleCollectionSelection(colId)
+            saveCancelVm.confirmCollectionSelection()
+            advanceUntilIdle()
+
+            assertFalse(saveCancelVm.collectionsUiState.value.isSaving)
+            assertNull(saveCancelVm.collectionsUiState.value.pickerErrorMessage)
         } finally {
             Dispatchers.resetMain()
         }

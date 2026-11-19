@@ -143,6 +143,25 @@ class CollectionDetailViewModelTest {
     }
 
     @Test
+    fun `loadCollection with non-existent collectionId stops loading and sets collection not found message`() = runTest {
+        val articleRepository = FakeArticleRepository()
+        val collectionRepository = ReactiveCollectionRepository(articleRepository)
+
+        val viewModel = CollectionDetailViewModel(
+            savedStateHandle = SavedStateHandle(mapOf("collectionId" to 9999L)),
+            getCollectionWithArticlesUseCase = GetCollectionWithArticlesUseCase(collectionRepository),
+            renameCollectionUseCase = RenameCollectionUseCase(collectionRepository),
+            deleteCollectionUseCase = DeleteCollectionUseCase(collectionRepository),
+            removeArticleFromCollectionUseCase = RemoveArticleFromCollectionUseCase(articleRepository)
+        )
+
+        val state = viewModel.uiState.value
+        assertFalse(state.isLoading)
+        assertNull(state.collectionWithArticles)
+        assertEquals("Coleção não encontrada", state.errorMessage)
+    }
+
+    @Test
     fun `confirmRemoveArticle removes only link with current collection preserves article and other associations and updates reactively`() = runTest {
         val articleRepository = FakeArticleRepository()
         val collectionRepository = ReactiveCollectionRepository(articleRepository)

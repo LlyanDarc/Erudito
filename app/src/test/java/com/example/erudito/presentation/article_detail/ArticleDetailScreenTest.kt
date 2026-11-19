@@ -384,4 +384,48 @@ class ArticleDetailScreenTest {
             Dispatchers.resetMain()
         }
     }
+
+    @Test
+    fun `ArticleDetailScreen shows snackbar feedback when LocalUriHandler fails to open URL`(): Unit = runBlocking {
+        val dispatcher = UnconfinedTestDispatcher()
+        Dispatchers.setMain(dispatcher)
+        try {
+            val collectionRepo = FakeCollectionRepository()
+            val articleRepo = FakeArticleRepository()
+            val articleId = articleRepo.insertArticle(
+                Article(
+                    title = "Emmy Noether",
+                    content = "Matemática alemã.",
+                    url = "https://pt.wikipedia.org/wiki/Emmy_Noether",
+                    wikipediaPageId = 202L
+                )
+            )
+            val viewModel = buildViewModel(articleId, collectionRepo, articleRepo)
+            val failingUriHandler = object : UriHandler {
+                override fun openUri(uri: String) {
+                    throw IllegalStateException("Nenhum navegador encontrado")
+                }
+            }
+
+            composeTestRule.setContent {
+                CompositionLocalProvider(LocalUriHandler provides failingUriHandler) {
+                    ArticleDetailScreen(
+                        viewModel = viewModel,
+                        onNavigateBack = {}
+                    )
+                }
+            }
+
+            composeTestRule.waitForIdle()
+            composeTestRule.onNodeWithTag("article_detail_open_url_button")
+                .performScrollTo()
+                .performClick()
+            composeTestRule.waitForIdle()
+
+            composeTestRule.onNodeWithText("Não foi possível abrir o link no navegador.")
+                .assertIsDisplayed()
+        } finally {
+            Dispatchers.resetMain()
+        }
+    }
 }

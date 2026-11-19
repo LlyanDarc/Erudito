@@ -52,7 +52,7 @@ fun CollectionCard(
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
     val formattedDate = remember(collection.createdAt) {
-        val sdf = SimpleDateFormat("dd 'de' MMM, yyyy", Locale("pt", "BR"))
+        val sdf = SimpleDateFormat("dd 'de' MMM, yyyy", Locale.forLanguageTag("pt-BR"))
         sdf.format(Date(collection.createdAt))
     }
 

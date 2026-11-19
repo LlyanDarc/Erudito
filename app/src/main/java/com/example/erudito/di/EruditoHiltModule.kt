@@ -53,7 +53,7 @@ object EruditoHiltModule {
 
     internal const val WIKIPEDIA_BASE_URL = "https://pt.wikipedia.org/"
     internal val WIKIPEDIA_USER_AGENT =
-        "Erudito/${BuildConfig.VERSION_NAME} (https://github.com/LlyanDarc/Erudito; 881881um@gmail.com) OkHttp/4.10.0"
+        "Erudito/${BuildConfig.VERSION_NAME} (https://github.com/LlyanDarc/Erudito) OkHttp/4.10.0"
 
     @Provides
     @Singleton

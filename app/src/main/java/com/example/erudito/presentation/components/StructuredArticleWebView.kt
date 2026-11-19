@@ -583,6 +583,7 @@ internal fun configureArticleWebSettings(webSettings: WebSettings) {
         @Suppress("DEPRECATION")
         allowUniversalAccessFromFileURLs = false
         domStorageEnabled = false
+        @Suppress("DEPRECATION")
         databaseEnabled = false
         @Suppress("DEPRECATION")
         setGeolocationEnabled(false)
@@ -607,6 +608,8 @@ private fun applyWebViewTheme(webView: WebView, isDarkTheme: Boolean) {
             "window.EruditoMath && window.EruditoMath.setTheme('$themeArg');",
             null
         )
+    }.onFailure { error ->
+        safeLogWarn("Failed to apply WebView theme: ${error.message}")
     }
 }
 
@@ -625,6 +628,8 @@ private fun updateMeasuredContentHeight(
                 onMeasuredDp(coercedHeight.dp)
             }
         }
+    }.onFailure { error ->
+        safeLogWarn("Failed to measure WebView content height: ${error.message}")
     }
 }
 
@@ -671,6 +676,8 @@ internal fun cleanupWebView(
         webView.removeAllViews()
         (webView.parent as? ViewGroup)?.removeView(webView)
         webView.destroy()
+    }.onFailure { error ->
+        safeLogWarn("Error while cleaning up WebView: ${error.message}")
     }
 }
 

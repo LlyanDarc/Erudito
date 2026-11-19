@@ -44,7 +44,7 @@ fun ArticleCard(
     onRemoveFromCollectionClick: (() -> Unit)? = null
 ) {
     val formattedDate = remember(article.lastUpdated) {
-        val sdf = SimpleDateFormat("dd/MM/yyyy", Locale("pt", "BR"))
+        val sdf = SimpleDateFormat("dd/MM/yyyy", Locale.forLanguageTag("pt-BR"))
         sdf.format(Date(article.lastUpdated))
     }
 

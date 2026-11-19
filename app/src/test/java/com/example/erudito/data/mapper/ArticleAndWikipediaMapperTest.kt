@@ -273,4 +273,62 @@ class ArticleAndWikipediaMapperTest {
             )
         )
     }
+
+    @Test
+    fun `wikipedia mappers enforce HTTPS-only image URLs and discard insecure schemes`() {
+        val insecureSchemes = listOf(
+            "http://upload.wikimedia.org/insecure.png",
+            "data:image/png;base64,iVBORw0KGgo=",
+            "javascript:alert(1)",
+            "file:///etc/passwd",
+            "//upload.wikimedia.org/protocol_relative.png",
+            "not a valid url"
+        )
+
+        insecureSchemes.forEach { rawUrl ->
+            val pageDto = WikipediaPageDto(
+                pageId = 700L,
+                title = "Segurança",
+                extract = "Texto",
+                original = WikipediaImageDto(rawUrl),
+                thumbnail = WikipediaImageDto(rawUrl)
+            )
+
+            assertNull(
+                "Expected search thumbnailUrl to be rejected for: $rawUrl",
+                pageDto.toSearchResultOrNull()?.thumbnailUrl
+            )
+            assertNull(
+                "Expected plain article imageUrl to be rejected for: $rawUrl",
+                pageDto.toWikipediaArticleOrNull()?.imageUrl
+            )
+            assertNull(
+                "Expected structured article imageUrl to be rejected for: $rawUrl",
+                pageDto.toStructuredWikipediaArticleOrNull(
+                    SanitizedWikipediaHtml("<p>Conteúdo</p>", 0, 0)
+                )?.imageUrl
+            )
+        }
+
+        val secureDto = WikipediaPageDto(
+            pageId = 701L,
+            title = "HTTPS",
+            extract = "Texto",
+            original = WikipediaImageDto("  https://upload.wikimedia.org/wikipedia/commons/a/a1/Secure.png  ")
+        )
+        assertEquals(
+            "https://upload.wikimedia.org/wikipedia/commons/a/a1/Secure.png",
+            secureDto.toSearchResultOrNull()?.thumbnailUrl
+        )
+        assertEquals(
+            "https://upload.wikimedia.org/wikipedia/commons/a/a1/Secure.png",
+            secureDto.toWikipediaArticleOrNull()?.imageUrl
+        )
+        assertEquals(
+            "https://upload.wikimedia.org/wikipedia/commons/a/a1/Secure.png",
+            secureDto.toStructuredWikipediaArticleOrNull(
+                SanitizedWikipediaHtml("<p>Conteúdo</p>", 0, 0)
+            )?.imageUrl
+        )
+    }
 }

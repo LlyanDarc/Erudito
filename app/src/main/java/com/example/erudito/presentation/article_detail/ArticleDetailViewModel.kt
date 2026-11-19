@@ -15,6 +15,8 @@ import com.example.erudito.domain.usecase.GetCollectionsUseCase
 import com.example.erudito.domain.usecase.ObserveArticleByIdUseCase
 import com.example.erudito.domain.usecase.RefreshSavedArticleUseCase
 import com.example.erudito.domain.usecase.RemoveArticleFromCollectionUseCase
+import com.example.erudito.presentation.components.CollectionPickerCoordinator
+import com.example.erudito.presentation.components.CollectionPickerMessages
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.CancellationException
@@ -197,13 +199,11 @@ class ArticleDetailViewModel @Inject constructor(
     fun toggleCollectionSelection(collectionId: Long) {
         if (_uiState.value.isSavingCollections) return
         _uiState.update { current ->
-            val updated = if (collectionId in current.selectedCollectionIds) {
-                current.selectedCollectionIds - collectionId
-            } else {
-                current.selectedCollectionIds + collectionId
-            }
             current.copy(
-                selectedCollectionIds = updated,
+                selectedCollectionIds = CollectionPickerCoordinator.toggleSelection(
+                    currentSelection = current.selectedCollectionIds,
+                    collectionId = collectionId
+                ),
                 pickerErrorMessage = null
             )
         }
@@ -214,27 +214,30 @@ class ArticleDetailViewModel @Inject constructor(
         if (currentState.isCreatingCollection || currentState.isSavingCollections) return
 
         viewModelScope.launch {
-            _uiState.update {
-                it.copy(isCreatingCollection = true, pickerErrorMessage = null)
-            }
-            try {
-                val trimmedName = name.trim()
-                createCollectionUseCase(name)
-                _uiState.update { it.copy(isCreatingCollection = false) }
-                _feedbackEvents.send("Coleção \"$trimmedName\" criada com sucesso!")
-            } catch (e: CancellationException) {
-                _uiState.update { it.copy(isCreatingCollection = false) }
-                throw e
-            } catch (e: Exception) {
-                val errorMsg = e.message?.takeIf { it.isNotBlank() } ?: "Erro ao criar coleção."
-                _uiState.update {
-                    it.copy(
-                        isCreatingCollection = false,
-                        pickerErrorMessage = errorMsg
-                    )
-                }
-                _feedbackEvents.send(errorMsg)
-            }
+            CollectionPickerCoordinator.createCollection(
+                name = name,
+                createCollectionUseCase = createCollectionUseCase,
+                onStart = {
+                    _uiState.update {
+                        it.copy(isCreatingCollection = true, pickerErrorMessage = null)
+                    }
+                },
+                onSuccess = {
+                    _uiState.update { it.copy(isCreatingCollection = false) }
+                },
+                onFailure = { errorMsg ->
+                    _uiState.update {
+                        it.copy(
+                            isCreatingCollection = false,
+                            pickerErrorMessage = errorMsg
+                        )
+                    }
+                },
+                onCancelled = {
+                    _uiState.update { it.copy(isCreatingCollection = false) }
+                },
+                emitFeedback = { _feedbackEvents.send(it) }
+            )
         }
     }
 
@@ -243,80 +246,60 @@ class ArticleDetailViewModel @Inject constructor(
         if (currentState.isSavingCollections) return
         val article = currentState.article ?: return
 
-        val savedIds = currentState.savedCollectionIds
-        val selectedIds = currentState.selectedCollectionIds
-        val toAdd = selectedIds - savedIds
-        val toRemove = savedIds - selectedIds
-
-        if (selectedIds.isEmpty() && savedIds.isEmpty()) {
-            _uiState.update {
-                it.copy(pickerErrorMessage = EMPTY_SELECTION_ERROR_MESSAGE)
-            }
-            return
-        }
-
-        if (toAdd.isEmpty() && toRemove.isEmpty()) {
-            _uiState.update {
-                it.copy(isPickerVisible = false, pickerErrorMessage = null)
-            }
-            return
-        }
-
         viewModelScope.launch {
-            _uiState.update {
-                it.copy(isSavingCollections = true, pickerErrorMessage = null)
-            }
-            try {
-                if (toAdd.isNotEmpty()) {
-                    addArticleToCollectionsUseCase(
-                        articleId = article.id,
-                        collectionIds = toAdd.toList()
-                    )
-                }
-
-                if (toRemove.isNotEmpty()) {
+            CollectionPickerCoordinator.confirmSelection(
+                savedIds = currentState.savedCollectionIds,
+                selectedIds = currentState.selectedCollectionIds,
+                messages = PICKER_MESSAGES,
+                onValidationError = { errorMsg ->
+                    _uiState.update { it.copy(pickerErrorMessage = errorMsg) }
+                },
+                onNoChanges = {
+                    _uiState.update {
+                        it.copy(isPickerVisible = false, pickerErrorMessage = null)
+                    }
+                },
+                onStart = {
+                    _uiState.update {
+                        it.copy(isSavingCollections = true, pickerErrorMessage = null)
+                    }
+                },
+                persistChanges = { toAdd, toRemove ->
+                    if (toAdd.isNotEmpty()) {
+                        addArticleToCollectionsUseCase(
+                            articleId = article.id,
+                            collectionIds = toAdd.toList()
+                        )
+                    }
                     toRemove.forEach { collectionId ->
                         removeArticleFromCollectionUseCase(
                             articleId = article.id,
                             collectionId = collectionId
                         )
                     }
-                }
-
-                _uiState.update {
-                    it.copy(
-                        isSavingCollections = false,
-                        isPickerVisible = false,
-                        pickerErrorMessage = null
-                    )
-                }
-
-                val feedbackMessage = when {
-                    selectedIds.isEmpty() ->
-                        "Artigo removido das coleções. Ele continua salvo na biblioteca."
-                    toAdd.isNotEmpty() && toRemove.isEmpty() -> {
-                        if (selectedIds.size == 1) {
-                            "Artigo salvo na coleção!"
-                        } else {
-                            "Artigo salvo em ${selectedIds.size} coleções!"
-                        }
+                },
+                onSuccess = {
+                    _uiState.update {
+                        it.copy(
+                            isSavingCollections = false,
+                            isPickerVisible = false,
+                            pickerErrorMessage = null
+                        )
                     }
-                    else -> "Coleções do artigo atualizadas!"
-                }
-                _feedbackEvents.send(feedbackMessage)
-            } catch (e: CancellationException) {
-                _uiState.update { it.copy(isSavingCollections = false) }
-                throw e
-            } catch (e: Exception) {
-                val errorMsg = e.message?.takeIf { it.isNotBlank() } ?: SAVE_ERROR_MESSAGE
-                _uiState.update {
-                    it.copy(
-                        isSavingCollections = false,
-                        pickerErrorMessage = errorMsg
-                    )
-                }
-                _feedbackEvents.send(errorMsg)
-            }
+                },
+                onFailure = { errorMsg ->
+                    _uiState.update {
+                        it.copy(
+                            isSavingCollections = false,
+                            pickerErrorMessage = errorMsg
+                        )
+                    }
+                },
+                onCancelled = {
+                    _uiState.update { it.copy(isSavingCollections = false) }
+                },
+                emitFeedback = { _feedbackEvents.send(it) }
+            )
         }
     }
 
@@ -361,6 +344,10 @@ class ArticleDetailViewModel @Inject constructor(
         }
     }
 
+    fun onOpenExternalLinkFailed() {
+        _feedbackEvents.trySend(OPEN_LINK_ERROR_MESSAGE)
+    }
+
     private fun mapFriendlySyncError(outcome: RefreshArticleOutcome.Failed): String {
         return if (outcome.cause is WikipediaException && outcome.message.isNotBlank()) {
             outcome.message
@@ -370,11 +357,13 @@ class ArticleDetailViewModel @Inject constructor(
     }
 
     companion object {
-        private const val EMPTY_SELECTION_ERROR_MESSAGE =
-            "Selecione pelo menos uma coleção para associar o artigo."
-        private const val SAVE_ERROR_MESSAGE =
-            "Não foi possível atualizar as coleções do artigo."
+        private val PICKER_MESSAGES = CollectionPickerMessages(
+            emptySelectionError = "Selecione pelo menos uma coleção para associar o artigo.",
+            allRemovedFeedback = "Artigo removido das coleções. Ele continua salvo na biblioteca."
+        )
         private const val REFRESH_GENERIC_ERROR_MESSAGE =
             "Não foi possível atualizar o artigo no momento. O conteúdo local foi preservado."
+        private const val OPEN_LINK_ERROR_MESSAGE =
+            "Não foi possível abrir o link no navegador."
     }
 }

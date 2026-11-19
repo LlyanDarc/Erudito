@@ -231,4 +231,38 @@ class ArticleHtmlRenderingUnitTest {
         assertTrue(doc5Parsoid.contains("erudito-math-block"))
         assertTrue(doc5Parsoid.contains("https://thumb.wikimedia.org/"))
     }
+
+    @Test
+    fun `remote image policy and CSP restrict images exclusively to HTTPS`() {
+        assertTrue(ArticleHtmlDocumentBuilder.CONTENT_SECURITY_POLICY.contains("img-src https:;"))
+        assertFalse(ArticleHtmlDocumentBuilder.CONTENT_SECURITY_POLICY.contains("img-src https: data:"))
+
+        assertTrue(
+            StructuredArticleSecurityPolicy.isAllowedRemoteImageUrl(
+                "https://upload.wikimedia.org/wikipedia/commons/example.jpg"
+            )
+        )
+        assertFalse(StructuredArticleSecurityPolicy.isAllowedRemoteImageUrl(null))
+        assertFalse(StructuredArticleSecurityPolicy.isAllowedRemoteImageUrl("   "))
+        assertFalse(
+            StructuredArticleSecurityPolicy.isAllowedRemoteImageUrl(
+                "http://upload.wikimedia.org/example.jpg"
+            )
+        )
+        assertFalse(
+            StructuredArticleSecurityPolicy.isAllowedRemoteImageUrl(
+                "data:image/png;base64,AAAA"
+            )
+        )
+        assertFalse(
+            StructuredArticleSecurityPolicy.isAllowedRemoteImageUrl(
+                "file:///data/user/0/app/secret.png"
+            )
+        )
+        assertFalse(
+            StructuredArticleSecurityPolicy.isAllowedRemoteImageUrl(
+                "https://appassets.androidplatform.net/assets/katex/test.png"
+            )
+        )
+    }
 }

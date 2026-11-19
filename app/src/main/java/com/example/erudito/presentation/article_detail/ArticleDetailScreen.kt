@@ -71,6 +71,7 @@ import com.example.erudito.presentation.components.ArticleBodyContent
 import com.example.erudito.presentation.components.CollectionPickerDialog
 import com.example.erudito.presentation.components.EmptyStateView
 import com.example.erudito.presentation.components.EruditoTopAppBar
+import com.example.erudito.presentation.components.StructuredArticleSecurityPolicy
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -97,6 +98,7 @@ fun ArticleDetailScreen(
         onNavigateBack = onNavigateBack,
         onOpenOriginalUrl = { url ->
             runCatching { uriHandler.openUri(url) }
+                .onFailure { viewModel.onOpenExternalLinkFailed() }
         },
         onRefreshArticle = { viewModel.refreshArticle() },
         onOpenCollectionPicker = { viewModel.openCollectionPicker() },
@@ -177,17 +179,19 @@ fun ArticleDetailScreenContent(
             )
         } else {
             val article = uiState.article
-            val hasImage = !article.imageUrl.isNullOrBlank()
-            var imageLoadFailed by remember(article.imageUrl) { mutableStateOf(false) }
+            val safeImageUrl = article.imageUrl?.takeIf {
+                StructuredArticleSecurityPolicy.isAllowedRemoteImageUrl(it)
+            }
+            var imageLoadFailed by remember(safeImageUrl) { mutableStateOf(false) }
 
             val formattedDate = remember(article.lastUpdated) {
-                val sdf = SimpleDateFormat("dd 'de' MMMM 'de' yyyy", Locale("pt", "BR"))
+                val sdf = SimpleDateFormat("dd 'de' MMMM 'de' yyyy", Locale.forLanguageTag("pt-BR"))
                 sdf.format(Date(article.lastUpdated))
             }
 
             val formattedSyncDate = remember(article.lastSyncedAt) {
                 article.lastSyncedAt?.let { syncedAt ->
-                    val sdf = SimpleDateFormat("dd/MM/yyyy 'às' HH:mm", Locale("pt", "BR"))
+                    val sdf = SimpleDateFormat("dd/MM/yyyy 'às' HH:mm", Locale.forLanguageTag("pt-BR"))
                     sdf.format(Date(syncedAt))
                 }
             }
@@ -295,7 +299,7 @@ fun ArticleDetailScreenContent(
                         }
                     }
 
-                    if (hasImage) {
+                    if (safeImageUrl != null) {
                         Spacer(modifier = Modifier.height(16.dp))
                         Surface(
                             shape = RoundedCornerShape(16.dp),
@@ -310,7 +314,7 @@ fun ArticleDetailScreenContent(
                             if (!imageLoadFailed) {
                                 AsyncImage(
                                     model = ImageRequest.Builder(LocalContext.current)
-                                        .data(article.imageUrl)
+                                        .data(safeImageUrl)
                                         .crossfade(true)
                                         .build(),
                                     contentDescription = "Imagem de ${article.title}",
@@ -566,25 +570,30 @@ fun ArticleDetailScreenContent(
                                         color = MaterialTheme.colorScheme.onSurface
                                     )
                                     Spacer(modifier = Modifier.height(2.dp))
-                                    Text(
-                                        text = article.url,
-                                        style = MaterialTheme.typography.bodySmall.copy(
-                                            textDecoration = if (originalUrl.isNotEmpty()) {
-                                                TextDecoration.Underline
-                                            } else {
-                                                TextDecoration.None
-                                            }
-                                        ),
-                                        color = MaterialTheme.colorScheme.primary,
+                                    Box(
+                                        contentAlignment = Alignment.CenterStart,
                                         modifier = Modifier
                                             .fillMaxWidth()
+                                            .heightIn(min = 48.dp)
                                             .clip(RoundedCornerShape(6.dp))
                                             .clickable(enabled = originalUrl.isNotEmpty()) {
                                                 onOpenOriginalUrl(originalUrl)
                                             }
-                                            .padding(vertical = 4.dp)
+                                            .padding(vertical = 8.dp)
                                             .testTag("article_detail_url_text")
-                                    )
+                                    ) {
+                                        Text(
+                                            text = article.url,
+                                            style = MaterialTheme.typography.bodySmall.copy(
+                                                textDecoration = if (originalUrl.isNotEmpty()) {
+                                                    TextDecoration.Underline
+                                                } else {
+                                                    TextDecoration.None
+                                                }
+                                            ),
+                                            color = MaterialTheme.colorScheme.primary
+                                        )
+                                    }
                                 }
                             }
 

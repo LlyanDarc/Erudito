@@ -37,7 +37,7 @@ class WikipediaRepositoryImpl @Inject constructor(
         val metadataPage = metadataResponse.query?.pages?.firstOrNull() ?: return null
         if (metadataPage.missing == true) return null
 
-        val resolvedPageId = metadataPage.pageId?.takeIf { it > 0L } ?: return null
+        if ((metadataPage.pageId ?: 0L) <= 0L) return null
         val canonicalTitle = metadataPage.title?.trim()?.takeIf { it.isNotEmpty() } ?: return null
 
         val parsoidTitle = normalizeParsoidTitle(canonicalTitle)

@@ -19,6 +19,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.Book
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
@@ -27,7 +28,6 @@ import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.CollectionsBookmark
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Folder
-import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.IconButton
@@ -219,7 +219,10 @@ fun HomeScreenContent(
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 // Hero Banner
-                item {
+                item(
+                    key = "home_hero_banner",
+                    contentType = "hero_banner"
+                ) {
                     Card(
                         shape = RoundedCornerShape(20.dp),
                         colors = CardDefaults.cardColors(
@@ -251,7 +254,7 @@ fun HomeScreenContent(
                                     ) {
                                         Box(contentAlignment = Alignment.Center) {
                                             Icon(
-                                                imageVector = Icons.Default.MenuBook,
+                                                imageVector = Icons.AutoMirrored.Filled.MenuBook,
                                                 contentDescription = null,
                                                 tint = MaterialTheme.colorScheme.onPrimary
                                             )
@@ -363,7 +366,10 @@ fun HomeScreenContent(
                 }
 
                 if (uiState.syncStatus !is HomeSyncStatus.Idle) {
-                    item(key = "home_sync_status_item") {
+                    item(
+                        key = "home_sync_status_item",
+                        contentType = "sync_status"
+                    ) {
                         HomeSyncStatusBanner(
                             syncStatus = uiState.syncStatus,
                             onRetry = onRetrySync,
@@ -373,7 +379,10 @@ fun HomeScreenContent(
                 }
 
                 // Seção Coleções
-                item {
+                item(
+                    key = "home_collections_header",
+                    contentType = "section_header"
+                ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -386,7 +395,9 @@ fun HomeScreenContent(
                         )
                         TextButton(
                             onClick = onNavigateToCollections,
-                            modifier = Modifier.testTag("view_all_collections_button")
+                            modifier = Modifier
+                                .heightIn(min = 48.dp)
+                                .testTag("view_all_collections_button")
                         ) {
                             Text("Ver todas (${uiState.collections.size})")
                         }
@@ -394,7 +405,10 @@ fun HomeScreenContent(
                 }
 
                 if (uiState.collections.isEmpty()) {
-                    item {
+                    item(
+                        key = "empty_state_collections",
+                        contentType = "empty_state"
+                    ) {
                         EmptyStateView(
                             icon = Icons.Default.Folder,
                             title = "Nenhuma coleção criada",
@@ -406,7 +420,8 @@ fun HomeScreenContent(
                 } else {
                     items(
                         items = uiState.collections.take(3),
-                        key = { "collection_${it.id}" }
+                        key = { "collection_${it.id}" },
+                        contentType = { "collection_card" }
                     ) { collection ->
                         CollectionCard(
                             collection = collection,
@@ -418,7 +433,10 @@ fun HomeScreenContent(
                 }
 
                 // Seção Artigos Salvos na Biblioteca
-                item(key = "section_recent_articles_header") {
+                item(
+                    key = "section_recent_articles_header",
+                    contentType = "section_header"
+                ) {
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
                         text = "Artigos Armazenados Localmente",
@@ -428,7 +446,10 @@ fun HomeScreenContent(
                 }
 
                 if (uiState.recentArticles.isEmpty()) {
-                    item(key = "empty_state_recent_articles") {
+                    item(
+                        key = "empty_state_recent_articles",
+                        contentType = "empty_state"
+                    ) {
                         EmptyStateView(
                             icon = Icons.Default.Book,
                             title = "Nenhum artigo salvo",
@@ -438,7 +459,8 @@ fun HomeScreenContent(
                 } else {
                     items(
                         items = uiState.recentArticles,
-                        key = { "article_${it.id}" }
+                        key = { "article_${it.id}" },
+                        contentType = { "article_card" }
                     ) { article ->
                         ArticleCard(
                             article = article,
@@ -448,7 +470,10 @@ fun HomeScreenContent(
                 }
 
                 // Bottom spacer for FAB clearance
-                item {
+                item(
+                    key = "home_bottom_spacer",
+                    contentType = "spacer"
+                ) {
                     Spacer(modifier = Modifier.height(72.dp))
                 }
             }

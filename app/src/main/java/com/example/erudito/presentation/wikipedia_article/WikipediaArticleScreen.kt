@@ -68,6 +68,7 @@ import com.example.erudito.presentation.components.ArticleBodyContent
 import com.example.erudito.presentation.components.CollectionPickerDialog
 import com.example.erudito.presentation.components.EmptyStateView
 import com.example.erudito.presentation.components.EruditoTopAppBar
+import com.example.erudito.presentation.components.StructuredArticleSecurityPolicy
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
@@ -93,6 +94,7 @@ fun WikipediaArticleScreen(
         onRetry = { viewModel.retry() },
         onOpenOriginalUrl = { url ->
             runCatching { uriHandler.openUri(url) }
+                .onFailure { viewModel.onOpenExternalLinkFailed() }
         },
         collectionsUiState = collectionsUiState,
         onOpenCollectionPicker = { viewModel.openCollectionPicker() },
@@ -202,8 +204,10 @@ fun WikipediaArticleScreenContent(
 
                 is WikipediaArticleUiState.Success -> {
                     val article = uiState.article
-                    val hasImage = !article.imageUrl.isNullOrBlank()
-                    var imageLoadFailed by remember(article.imageUrl) { mutableStateOf(false) }
+                    val safeImageUrl = article.imageUrl?.takeIf {
+                        StructuredArticleSecurityPolicy.isAllowedRemoteImageUrl(it)
+                    }
+                    var imageLoadFailed by remember(safeImageUrl) { mutableStateOf(false) }
 
                     Column(
                         modifier = Modifier
@@ -342,7 +346,7 @@ fun WikipediaArticleScreenContent(
                                 }
                             }
 
-                            if (hasImage) {
+                            if (safeImageUrl != null) {
                                 Spacer(modifier = Modifier.height(16.dp))
                                 Surface(
                                     shape = RoundedCornerShape(16.dp),
@@ -357,7 +361,7 @@ fun WikipediaArticleScreenContent(
                                     if (!imageLoadFailed) {
                                         AsyncImage(
                                             model = ImageRequest.Builder(LocalContext.current)
-                                                .data(article.imageUrl)
+                                                .data(safeImageUrl)
                                                 .crossfade(true)
                                                 .build(),
                                             contentDescription = "Imagem de ${article.title}",

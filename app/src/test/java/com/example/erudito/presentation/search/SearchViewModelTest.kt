@@ -350,6 +350,28 @@ class SearchViewModelTest {
         }
     }
 
+    @Test
+    fun `search propagates CancellationException without emitting Error state`() = runTest {
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        Dispatchers.setMain(dispatcher)
+        try {
+            val viewModel = buildViewModel()
+            fakeRepository.exceptionToThrow = kotlinx.coroutines.CancellationException("Busca cancelada")
+
+            viewModel.onQueryChange("Física quântica")
+            viewModel.search()
+            advanceUntilIdle()
+
+            val state = viewModel.uiState.value
+            assertFalse(state.hasSearched)
+            assertNull(state.errorMessage)
+            assertTrue(state.results.isEmpty())
+            assertFalse(state.contentState is SearchContentState.Error)
+        } finally {
+            Dispatchers.resetMain()
+        }
+    }
+
     private class FakeWikipediaRepository : WikipediaRepository {
         var searchCallCount = 0
         var lastQuery: String? = null

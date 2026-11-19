@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -117,7 +118,7 @@ fun CollectionDetailScreen(
 
     val formattedDate = remember(collection?.createdAt) {
         collection?.createdAt?.let {
-            val sdf = SimpleDateFormat("dd 'de' MMMM, yyyy", Locale("pt", "BR"))
+            val sdf = SimpleDateFormat("dd 'de' MMMM, yyyy", Locale.forLanguageTag("pt-BR"))
             sdf.format(Date(it))
         } ?: ""
     }
@@ -217,7 +218,10 @@ fun CollectionDetailScreen(
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 // Header Card
-                item {
+                item(
+                    key = "collection_detail_header",
+                    contentType = "collection_header"
+                ) {
                     Card(
                         shape = RoundedCornerShape(20.dp),
                         colors = CardDefaults.cardColors(
@@ -302,7 +306,10 @@ fun CollectionDetailScreen(
                 }
 
                 // Artigos da Coleção
-                item {
+                item(
+                    key = "collection_detail_articles_header",
+                    contentType = "section_header"
+                ) {
                     Text(
                         text = "Artigos da Coleção",
                         style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
@@ -311,7 +318,10 @@ fun CollectionDetailScreen(
                 }
 
                 if (articles.isEmpty()) {
-                    item {
+                    item(
+                        key = "collection_detail_empty_articles",
+                        contentType = "empty_state"
+                    ) {
                         EmptyStateView(
                             icon = Icons.AutoMirrored.Filled.MenuBook,
                             title = "Nenhum artigo nesta coleção",
@@ -321,7 +331,8 @@ fun CollectionDetailScreen(
                 } else {
                     items(
                         items = articles,
-                        key = { "article_${it.id}" }
+                        key = { "article_${it.id}" },
+                        contentType = { "article_card" }
                     ) { article ->
                         ArticleCard(
                             article = article,
@@ -404,7 +415,9 @@ private fun RemoveArticleFromCollectionDialog(
                 colors = ButtonDefaults.textButtonColors(
                     contentColor = MaterialTheme.colorScheme.error
                 ),
-                modifier = Modifier.testTag("confirm_remove_article_button")
+                modifier = Modifier
+                    .heightIn(min = 48.dp)
+                    .testTag("confirm_remove_article_button")
             ) {
                 Text("Remover")
             }
@@ -412,7 +425,9 @@ private fun RemoveArticleFromCollectionDialog(
         dismissButton = {
             TextButton(
                 onClick = onDismiss,
-                modifier = Modifier.testTag("cancel_remove_article_button")
+                modifier = Modifier
+                    .heightIn(min = 48.dp)
+                    .testTag("cancel_remove_article_button")
             ) {
                 Text("Cancelar")
             }
