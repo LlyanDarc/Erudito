@@ -128,19 +128,19 @@ Cada bundle representa um conjunto de funcionalidades relacionadas, desenvolvido
 - [x] **Etapa 5 — Documentação Final e Preparação da Entrega:**
   - [x] Auditar documentação e atualizar `README.md`, `SPECIFICATION.md`, `PLANNING.md`, `TASKS.md` e `TEST_RESULTS.md` com dados reais (Room v4, Parsoid, KaTeX `0.19.1`, Jsoup `1.18.3`, WebKit `1.18.0`, 44 suítes / 288 testes).
   - [x] Gerar e validar o pacote `Erudito-1.0-debug.zip` na raiz do projeto contendo exclusivamente `app-debug.apk` idêntico ao original (SHA-256 verificado).
-  - [x] Registrar limitações conhecidas (ausência de emulador/ADB na Etapa 4–5, ausência de `.git` no container e dispensa de `AI_USAGE.md`).
+  - [x] Registrar limitações conhecidas (ausência de emulador/ADB na Etapa 4–5 e ausência de `.git` no container).
+  - [x] Criar e finalizar o `AI_USAGE.md` na raiz do projeto (Registro de Utilização de Inteligência Artificial) e atualizar referências em `README.md` e `TASKS.md`.
 
-### Itens Pendentes / Dispensados (Registro Fiel)
+### Itens Pendentes Externos (Registro Fiel)
 
 - [ ] **Execução manual final em dispositivo físico ou emulador (pós-Etapa 4/5):** não executada nesta etapa porque o ambiente containerizado não possui emulador nem dispositivo conectado via `adb devices`; checklist objetivo registrado em `TEST_RESULTS.md` (nota: a Etapa D do Bundle 4 havia sido validada anteriormente no emulador).
-- [ ] **Atualização de `AI_USAGE.md`:** não criado por dispensa prévia do responsável pelo projeto (embora listado nos templates iniciais do projeto em `public/assets/aistudio/planning.md_92288048.txt` e `TASKS.md`); pendente de confirmação caso ainda seja exigido para entrega acadêmica.
 - [ ] **Revisão de histórico e criação de commits Git:** o diretório do workspace no container não possui repositório `.git` inicializado (`fatal: not a git repository`); nenhuma inicialização ou commit foi criado automaticamente.
 
 ### Critérios de conclusão
 
 - [x] Requisitos obrigatórios implementados e limitações devidamente documentadas.
 - [x] Testes executados integralmente após ajustes finais e resultados registrados (`44` suítes, `288` aprovados).
-- [x] Documentação técnica e de usuário atualizada (`README.md`, `SPECIFICATION.md`, `PLANNING.md`, `TASKS.md`, `TEST_RESULTS.md`).
+- [x] Documentação técnica, de usuário e de uso de IA atualizada (`README.md`, `SPECIFICATION.md`, `PLANNING.md`, `TASKS.md`, `TEST_RESULTS.md`, `AI_USAGE.md`).
 - [x] APK debug íntegro em `app/build/outputs/apk/debug/app-debug.apk` e pacote `Erudito-1.0-debug.zip` disponível na raiz.
 - [ ] Validação manual em dispositivo pós-Bundle 5 e versionamento Git local pendentes conforme ambiente/autorização do responsável.
 

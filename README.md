@@ -272,4 +272,16 @@ gradle :app:assembleDebug
 - **Validação final da Etapa 4 sem emulador/dispositivo conectado no container:** o ambiente de build não dispõe de emulador em execução nem dispositivos em `adb devices`; a verificação dinâmica final apoiou-se na suíte Robolectric/Compose (288 testes), ficando pendente em hardware/emulador o checklist manual descrito em `TEST_RESULTS.md`.
 - **Sincronização em segundo plano:** não utiliza `WorkManager`; a sincronização automática é disparada sob controle de ciclo de vida na `HomeScreen` (janela de 6 horas) e sob demanda manualmente.
 - **Fórmulas não extraíveis da Wikipédia:** expressões em que a API Parsoid/MathML não forneça código TeX recuperável são exibidas com o marcador `[Fórmula indisponível]` e sinalizadas ao leitor.
-- **Histórico Git e `AI_USAGE.md`:** o workspace não possui diretório `.git` inicializado no container, e `AI_USAGE.md` não foi criado por dispensa prévia registrada pelo responsável do projeto.
+- **Histórico Git no ambiente de build:** o workspace no container não possui diretório `.git` inicializado (`fatal: not a git repository`).
+
+---
+
+## 17. Documentação do Projeto
+
+- `SPECIFICATION.md` — Requisitos funcionais (`RF01`–`RF19`), regras de negócio (`RN01`–`RN11`) e escopo consolidado.
+- `PLANNING.md` — Arquitetura Clean Architecture + MVVM, stack técnica e decisões consolidadas.
+- `TASKS.md` — Decomposição e rastreamento dos Bundles 1 a 5.
+- `TEST_RESULTS.md` — Histórico de execuções, detalhamento das 44 suítes / 288 testes, inspeção de artefatos e checklist manual pendente.
+- `AI_USAGE.md` — Registro transparente da utilização de ferramentas de Inteligência Artificial durante o desenvolvimento.
+- `public/assets/aistudio/` — Versões iniciais dos documentos SDD preservadas como referência histórica do projeto.
+
